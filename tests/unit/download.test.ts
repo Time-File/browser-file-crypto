@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { downloadAndDecrypt } from '../../src/download';
+import { downloadAndDecrypt, downloadAndDecryptStream } from '../../src/download';
 import { encryptFile } from '../../src/encrypt';
+import { encryptFileStream } from '../../src/stream';
 import { generateKeyFile } from '../../src/keyfile';
 import { CryptoError } from '../../src/errors';
 
@@ -316,6 +317,200 @@ describe('downloadAndDecrypt', () => {
 
       const phases = progressCalls.map((p) => p.phase);
       expect(phases).not.toContain('deriving_key');
+    });
+  });
+});
+
+describe('downloadAndDecryptStream', () => {
+  const testText = 'Hello, Streaming Download! 🔐';
+  const testData = new TextEncoder().encode(testText);
+  const testBlob = new Blob([testData]);
+  const testPassword = 'test-password-123';
+  const testFileName = 'decrypted-stream-file.txt';
+
+  let mockLink: {
+    href: string;
+    download: string;
+    style: { display: string };
+    click: ReturnType<typeof vi.fn>;
+  };
+  let originalDocument: typeof document;
+  let originalURL: typeof URL;
+  let originalFetch: typeof fetch;
+
+  beforeEach(() => {
+    mockLink = {
+      href: '',
+      download: '',
+      style: { display: '' },
+      click: vi.fn(),
+    };
+
+    originalDocument = globalThis.document;
+    globalThis.document = {
+      createElement: vi.fn().mockReturnValue(mockLink),
+      body: {
+        appendChild: vi.fn(),
+        removeChild: vi.fn(),
+      },
+    } as unknown as Document;
+
+    originalURL = globalThis.URL;
+    globalThis.URL = {
+      createObjectURL: vi.fn().mockReturnValue('blob:mock-url'),
+      revokeObjectURL: vi.fn(),
+    } as unknown as typeof URL;
+
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.document = originalDocument;
+    globalThis.URL = originalURL;
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  describe('successful download and decrypt', () => {
+    it('should download, decrypt, and save streaming-encrypted file', async () => {
+      const encryptedStream = await encryptFileStream(testBlob, {
+        password: testPassword,
+      });
+      const response = new Response(encryptedStream);
+      const encrypted = await response.blob();
+      const encryptedBuffer = await encrypted.arrayBuffer();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: () => null,
+        },
+        blob: () => Promise.resolve(new Blob([encryptedBuffer])),
+      });
+
+      await downloadAndDecryptStream('https://example.com/file.enc', {
+        password: testPassword,
+        fileName: testFileName,
+      });
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com/file.enc');
+      expect(globalThis.document.createElement).toHaveBeenCalledWith('a');
+      expect(mockLink.download).toBe(testFileName);
+      expect(mockLink.click).toHaveBeenCalled();
+    });
+
+    it('should download keyfile-stream encrypted file', async () => {
+      const keyFile = generateKeyFile();
+      const encryptedStream = await encryptFileStream(testBlob, {
+        keyData: keyFile.key,
+      });
+      const response = new Response(encryptedStream);
+      const encrypted = await response.blob();
+      const encryptedBuffer = await encrypted.arrayBuffer();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: () => null,
+        },
+        blob: () => Promise.resolve(new Blob([encryptedBuffer])),
+      });
+
+      await downloadAndDecryptStream('https://example.com/file.enc', {
+        keyData: keyFile.key,
+        fileName: testFileName,
+      });
+
+      expect(mockLink.click).toHaveBeenCalled();
+    });
+  });
+
+  describe('progress tracking', () => {
+    it('should report progress phases including downloading', async () => {
+      const encryptedStream = await encryptFileStream(testBlob, {
+        password: testPassword,
+      });
+      const response = new Response(encryptedStream);
+      const encrypted = await response.blob();
+      const encryptedBuffer = await encrypted.arrayBuffer();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: (name: string) => (name === 'content-length' ? String(encryptedBuffer.byteLength) : null),
+        },
+        blob: () => Promise.resolve(new Blob([encryptedBuffer])),
+      });
+
+      const progressCalls: Array<{ phase: string }> = [];
+
+      await downloadAndDecryptStream('https://example.com/file.enc', {
+        password: testPassword,
+        fileName: testFileName,
+        onProgress: (p) => progressCalls.push({ phase: p.phase }),
+      });
+
+      const phases = progressCalls.map((p) => p.phase);
+      expect(phases).toContain('downloading');
+      expect(phases).toContain('complete');
+    });
+  });
+
+  describe('error handling', () => {
+    it('should throw DOWNLOAD_FAILED for HTTP error', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      });
+
+      await expect(
+        downloadAndDecryptStream('https://example.com/notfound.enc', {
+          password: testPassword,
+          fileName: testFileName,
+        })
+      ).rejects.toMatchObject({
+        code: 'DOWNLOAD_FAILED',
+      });
+    });
+
+    it('should throw DOWNLOAD_FAILED for network error', async () => {
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      await expect(
+        downloadAndDecryptStream('https://example.com/file.enc', {
+          password: testPassword,
+          fileName: testFileName,
+        })
+      ).rejects.toMatchObject({
+        code: 'DOWNLOAD_FAILED',
+      });
+    });
+
+    it('should throw INVALID_PASSWORD for wrong password', async () => {
+      const encryptedStream = await encryptFileStream(testBlob, {
+        password: testPassword,
+      });
+      const response = new Response(encryptedStream);
+      const encrypted = await response.blob();
+      const encryptedBuffer = await encrypted.arrayBuffer();
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: {
+          get: () => null,
+        },
+        blob: () => Promise.resolve(new Blob([encryptedBuffer])),
+      });
+
+      await expect(
+        downloadAndDecryptStream('https://example.com/file.enc', {
+          password: 'wrong-password',
+          fileName: testFileName,
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_PASSWORD',
+      });
     });
   });
 });

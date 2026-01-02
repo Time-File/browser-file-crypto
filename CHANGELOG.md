@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-01-02
+
+### Added
+
+- **`encryptFileAuto`** - Hybrid encryption that automatically switches to streaming for large files
+  - Configurable size threshold (default: 100MB)
+  - Same API as `encryptFile` with additional options
+- **`downloadAndDecryptStream`** - Streaming version of `downloadAndDecrypt` for large files
+- **Auto-detection in `decryptFile`** - Now automatically handles streaming-encrypted files
+  - No need to check format and call separate functions
+  - Seamlessly delegates to streaming decryption when needed
+- New types: `AutoEncryptOptions`, `DownloadDecryptStreamOptions`
+
+### Changed
+
+- **StreamProgressPhase unified** - Now uses `'encrypting'` / `'decrypting'` instead of `'processing'`
+  - Aligns with non-streaming `Progress` phases for UI compatibility
+  - Easier to share progress UI components between streaming and non-streaming modes
+
+### Fixed
+
+- `decryptFile` no longer throws `UNSUPPORTED_FORMAT` for streaming-encrypted files
+
 ## [1.1.0] - 2026-01-02
 
 ### Added

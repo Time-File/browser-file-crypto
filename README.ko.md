@@ -163,6 +163,26 @@ const decrypted = await decryptFile(encrypted, {
 });
 ```
 
+### 하이브리드 암호화 (v1.1.1+)
+
+파일 크기에 따라 자동으로 일반/스트리밍 암호화를 전환합니다:
+
+```typescript
+import { encryptFileAuto } from '@time-file/browser-file-crypto';
+
+// 100MB 이상 파일은 자동으로 스트리밍 사용
+const encrypted = await encryptFileAuto(file, {
+  password: 'secret',
+  autoStreaming: true,
+  streamingThreshold: 100 * 1024 * 1024,  // 100MB (기본값)
+  chunkSize: 1024 * 1024,  // 스트리밍 시 1MB 청크
+  onProgress: ({ phase, progress }) => console.log(`${phase}: ${progress}%`)
+});
+
+// decryptFile이 자동으로 두 포맷 모두 처리합니다!
+const decrypted = await decryptFile(encrypted, { password: 'secret' });
+```
+
 ### 스트리밍 암호화 (v1.1.0+)
 
 메모리에 맞지 않는 대용량 파일을 처리할 때:
@@ -183,7 +203,10 @@ const encryptedStream = await encryptFileStream(largeFile, {
 const response = new Response(encryptedStream);
 const encryptedBlob = await response.blob();
 
-// 복호화
+// 복호화 - decryptFile이 스트리밍 포맷을 자동 감지합니다!
+const decrypted = await decryptFile(encryptedBlob, { password: 'secret' });
+
+// 또는 스트리밍 복호화를 직접 사용
 const decryptedStream = decryptFileStream(encryptedBlob, { password: 'secret' });
 const decryptResponse = new Response(decryptedStream);
 const decryptedBlob = await decryptResponse.blob();
@@ -225,12 +248,20 @@ generateRandomPassword(24);     // 'Kx9#mP2$vL5@nQ8!...'
 ### 다운로드 & 복호화
 
 ```typescript
-import { downloadAndDecrypt } from '@time-file/browser-file-crypto';
+import { downloadAndDecrypt, downloadAndDecryptStream } from '@time-file/browser-file-crypto';
 
+// 일반 다운로드 & 복호화
 await downloadAndDecrypt('https://example.com/secret.enc', {
   password: 'secret',
   fileName: 'document.pdf',
   onProgress: ({ phase, progress }) => console.log(`${phase}: ${progress}%`)
+});
+
+// 스트리밍 다운로드 & 복호화 (v1.1.1+) - 대용량 파일용
+await downloadAndDecryptStream('https://example.com/large-file.enc', {
+  password: 'secret',
+  fileName: 'video.mp4',
+  onProgress: ({ phase, processedBytes }) => console.log(`${phase}: ${processedBytes} 바이트`)
 });
 ```
 
@@ -318,7 +349,10 @@ import type {
   // 스트리밍 타입 (v1.1.0+)
   StreamEncryptOptions,
   StreamDecryptOptions,
-  StreamProgress
+  StreamProgress,
+  // v1.1.1+
+  AutoEncryptOptions,
+  DownloadDecryptStreamOptions
 } from '@time-file/browser-file-crypto';
 ```
 

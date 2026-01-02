@@ -6,8 +6,9 @@
  */
 
 import { CryptoError } from './errors';
-import type { DownloadDecryptOptions } from './types';
+import type { DownloadDecryptOptions, DownloadDecryptStreamOptions, StreamProgress } from './types';
 import { decryptFile } from './decrypt';
+import { decryptFileStream } from './stream';
 
 /**
  * Downloads an encrypted file from URL, decrypts it, and saves to disk.
@@ -172,4 +173,120 @@ function saveFile(blob: Blob, fileName: string): void {
   document.body.removeChild(link);
 
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads a streaming-encrypted file from URL, decrypts it, and saves to disk.
+ *
+ * @description
+ * Memory-efficient version of downloadAndDecrypt for streaming-encrypted files.
+ * Uses streaming decryption to process data in chunks, suitable for large files.
+ *
+ * Phases:
+ * 1. `downloading` (0-50%): Fetching file from URL
+ * 2. `deriving_key` (50-55%): Key derivation (password mode only)
+ * 3. `decrypting` (55-95%): Streaming AES-GCM decryption
+ * 4. `complete` (100%): File saved
+ *
+ * Note: This function uses browser APIs (fetch, URL.createObjectURL, document.createElement)
+ * and will not work in Node.js environments.
+ *
+ * @param url - URL of the streaming-encrypted file to download
+ * @param options - Options including password/keyData and fileName
+ * @returns Promise that resolves when file is saved
+ *
+ * @throws {CryptoError} When download fails (DOWNLOAD_FAILED)
+ * @throws {CryptoError} When decryption fails (see decryptFileStream errors)
+ *
+ * @example
+ * ```typescript
+ * await downloadAndDecryptStream('https://example.com/large-file.enc', {
+ *   password: 'my-secret',
+ *   fileName: 'large-video.mp4',
+ *   onProgress: ({ phase, processedBytes, totalBytes }) => {
+ *     if (totalBytes) {
+ *       console.log(`${phase}: ${Math.round((processedBytes / totalBytes) * 100)}%`);
+ *     }
+ *   }
+ * });
+ * ```
+ *
+ * @see {@link downloadAndDecrypt} for non-streaming files
+ * @see {@link decryptFileStream} for decryption only
+ * @since 1.1.0
+ */
+export async function downloadAndDecryptStream(
+  url: string,
+  options: DownloadDecryptStreamOptions
+): Promise<void> {
+  const { fileName, password, keyData, onProgress } = options;
+
+  try {
+    // Phase 1: Download file
+    onProgress?.({
+      phase: 'downloading',
+      processedBytes: 0,
+      processedChunks: 0,
+      progress: 0,
+    });
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new CryptoError(
+        'DOWNLOAD_FAILED',
+        `Download failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const contentLength = response.headers.get('content-length');
+    const totalBytes = contentLength ? parseInt(contentLength, 10) : undefined;
+
+    // Report download progress
+    onProgress?.({
+      phase: 'downloading',
+      processedBytes: 0,
+      processedChunks: 0,
+      totalBytes,
+      progress: 25,
+    });
+
+    // Get response as blob for streaming decryption
+    const encryptedBlob = await response.blob();
+
+    // Phase 2 & 3: Streaming decryption
+    let decryptedBytes = 0;
+    const decryptedStream = decryptFileStream(encryptedBlob, {
+      password,
+      keyData,
+      onProgress: (progress: StreamProgress) => {
+        decryptedBytes = progress.processedBytes;
+        onProgress?.({
+          ...progress,
+          // Map to 50-95% range
+          progress: progress.phase === 'complete'
+            ? 100
+            : 50 + Math.round((progress.progress ?? 0) * 0.45),
+        });
+      },
+    });
+
+    // Convert stream to blob
+    const decryptedResponse = new Response(decryptedStream);
+    const decryptedBlob = await decryptedResponse.blob();
+
+    // Phase 4: Save file
+    saveFile(decryptedBlob, fileName);
+    onProgress?.({
+      phase: 'complete',
+      processedBytes: decryptedBytes,
+      processedChunks: 0,
+      progress: 100,
+    });
+  } catch (error) {
+    if (error instanceof CryptoError) {
+      throw error;
+    }
+    throw new CryptoError('DOWNLOAD_FAILED');
+  }
 }

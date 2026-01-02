@@ -183,9 +183,19 @@ export type EncryptionType =
 /**
  * Progress phase during streaming encryption/decryption operations.
  *
+ * @description
+ * - `deriving_key`: PBKDF2 key derivation in progress (password mode)
+ * - `encrypting`: AES-GCM streaming encryption in progress
+ * - `decrypting`: AES-GCM streaming decryption in progress
+ * - `downloading`: File download in progress (downloadAndDecryptStream)
+ * - `complete`: Operation finished successfully
+ *
+ * Note: For backward compatibility, these phases are aligned with
+ * the non-streaming Progress phases.
+ *
  * @since 1.1.0
  */
-export type StreamProgressPhase = 'deriving_key' | 'processing' | 'complete';
+export type StreamProgressPhase = 'deriving_key' | 'encrypting' | 'decrypting' | 'downloading' | 'complete';
 
 /**
  * Progress information for streaming encryption/decryption operations.
@@ -249,4 +259,45 @@ export interface StreamDecryptOptions {
 
   /** Progress callback for UI updates */
   onProgress?: StreamProgressCallback;
+}
+
+/**
+ * Options for streaming download and decrypt operation.
+ *
+ * @since 1.1.0
+ */
+export interface DownloadDecryptStreamOptions extends StreamDecryptOptions {
+  /** File name to use when saving the decrypted file */
+  fileName: string;
+}
+
+/**
+ * Auto encryption options for hybrid mode.
+ *
+ * @description
+ * Extended options that enable automatic switching between
+ * non-streaming and streaming encryption based on file size.
+ *
+ * @since 1.1.0
+ */
+export interface AutoEncryptOptions extends EncryptOptions {
+  /**
+   * Enable automatic streaming for large files.
+   * When true, files larger than streamingThreshold will use streaming encryption.
+   * @default false
+   */
+  autoStreaming?: boolean;
+
+  /**
+   * File size threshold in bytes for automatic streaming mode.
+   * Files larger than this size will use streaming encryption.
+   * @default 104857600 (100MB)
+   */
+  streamingThreshold?: number;
+
+  /**
+   * Chunk size for streaming encryption (only used when streaming is active).
+   * @default 65536 (64KB)
+   */
+  chunkSize?: number;
 }

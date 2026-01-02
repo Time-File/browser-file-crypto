@@ -164,6 +164,26 @@ const decrypted = await decryptFile(encrypted, {
 });
 ```
 
+### Hybrid Encryption (v1.1.1+)
+
+Auto-switch between standard and streaming encryption based on file size:
+
+```typescript
+import { encryptFileAuto } from '@time-file/browser-file-crypto';
+
+// Automatically uses streaming for files > 100MB
+const encrypted = await encryptFileAuto(file, {
+  password: 'secret',
+  autoStreaming: true,
+  streamingThreshold: 100 * 1024 * 1024,  // 100MB (default)
+  chunkSize: 1024 * 1024,  // 1MB chunks for streaming
+  onProgress: ({ phase, progress }) => console.log(`${phase}: ${progress}%`)
+});
+
+// decryptFile automatically handles both formats!
+const decrypted = await decryptFile(encrypted, { password: 'secret' });
+```
+
 ### Streaming Encryption (v1.1.0+)
 
 For large files that don't fit in memory:
@@ -184,7 +204,10 @@ const encryptedStream = await encryptFileStream(largeFile, {
 const response = new Response(encryptedStream);
 const encryptedBlob = await response.blob();
 
-// Decrypt
+// Decrypt - decryptFile auto-detects streaming format!
+const decrypted = await decryptFile(encryptedBlob, { password: 'secret' });
+
+// Or use streaming decryption directly
 const decryptedStream = decryptFileStream(encryptedBlob, { password: 'secret' });
 const decryptResponse = new Response(decryptedStream);
 const decryptedBlob = await decryptResponse.blob();
@@ -226,12 +249,20 @@ generateRandomPassword(24);     // 'Kx9#mP2$vL5@nQ8!...'
 ### Download & Decrypt
 
 ```typescript
-import { downloadAndDecrypt } from '@time-file/browser-file-crypto';
+import { downloadAndDecrypt, downloadAndDecryptStream } from '@time-file/browser-file-crypto';
 
+// Standard download & decrypt
 await downloadAndDecrypt('https://example.com/secret.enc', {
   password: 'secret',
   fileName: 'document.pdf',
   onProgress: ({ phase, progress }) => console.log(`${phase}: ${progress}%`)
+});
+
+// Streaming download & decrypt (v1.1.1+) - for large files
+await downloadAndDecryptStream('https://example.com/large-file.enc', {
+  password: 'secret',
+  fileName: 'video.mp4',
+  onProgress: ({ phase, processedBytes }) => console.log(`${phase}: ${processedBytes} bytes`)
 });
 ```
 
@@ -319,7 +350,10 @@ import type {
   // Streaming types (v1.1.0+)
   StreamEncryptOptions,
   StreamDecryptOptions,
-  StreamProgress
+  StreamProgress,
+  // v1.1.1+
+  AutoEncryptOptions,
+  DownloadDecryptStreamOptions
 } from '@time-file/browser-file-crypto';
 ```
 

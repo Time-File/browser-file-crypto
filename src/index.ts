@@ -36,7 +36,7 @@
 // Core Encryption/Decryption
 // =============================================================================
 
-export { encryptFile } from './encrypt';
+export { encryptFile, encryptFileAuto } from './encrypt';
 export { decryptFile } from './decrypt';
 
 // =============================================================================
@@ -72,7 +72,7 @@ export {
 // Download & Decrypt
 // =============================================================================
 
-export { downloadAndDecrypt } from './download';
+export { downloadAndDecrypt, downloadAndDecryptStream } from './download';
 
 // =============================================================================
 // Types
@@ -93,6 +93,9 @@ export type {
   StreamProgress,
   StreamProgressPhase,
   StreamProgressCallback,
+  // v1.1.1 additions
+  DownloadDecryptStreamOptions,
+  AutoEncryptOptions,
 } from './types';
 
 // =============================================================================

@@ -10,18 +10,21 @@ import {
   IV_LENGTH,
   ENCRYPTION_MARKER_PASSWORD,
   ENCRYPTION_MARKER_KEYFILE,
+  ENCRYPTION_MARKER_PASSWORD_STREAM,
+  ENCRYPTION_MARKER_KEYFILE_STREAM,
   MIN_ENCRYPTED_SIZE_PASSWORD,
   MIN_ENCRYPTED_SIZE_KEYFILE,
   ALGORITHM,
 } from './constants';
 import { CryptoError } from './errors';
-import type { DecryptOptions } from './types';
+import type { DecryptOptions, StreamProgress } from './types';
 import {
   normalizeInput,
   sliceBuffer,
   deriveKeyFromPassword,
   importKeyFromKeyfile,
 } from './utils';
+import { decryptFileStream } from './stream';
 
 /**
  * Decrypts a file that was encrypted with encryptFile.
@@ -104,6 +107,12 @@ export async function decryptFile(
         throw new CryptoError('KEYFILE_REQUIRED');
       }
       return await decryptWithKeyfile(data, keyData, onProgress);
+    } else if (
+      marker === ENCRYPTION_MARKER_PASSWORD_STREAM ||
+      marker === ENCRYPTION_MARKER_KEYFILE_STREAM
+    ) {
+      // Auto-delegate to streaming decryption
+      return await decryptStreamingFormat(encrypted, options);
     } else {
       throw new CryptoError('UNSUPPORTED_FORMAT');
     }
@@ -194,4 +203,45 @@ async function decryptWithKeyfile(
   } catch {
     throw new CryptoError('INVALID_KEYFILE');
   }
+}
+
+/**
+ * Decrypts streaming-encrypted data by delegating to decryptFileStream.
+ *
+ * @description
+ * This function provides automatic fallback for streaming-encrypted files
+ * when decryptFile() is called. It converts the streaming output back to
+ * a Blob for API compatibility.
+ *
+ * @internal
+ */
+async function decryptStreamingFormat(
+  encrypted: Blob | ArrayBuffer,
+  options: DecryptOptions
+): Promise<Blob> {
+  const { password, keyData, onProgress } = options;
+
+  // Convert ArrayBuffer to Blob if needed
+  const blob = encrypted instanceof Blob ? encrypted : new Blob([encrypted]);
+
+  // Map StreamProgress callback to Progress callback
+  const streamOnProgress = onProgress
+    ? (progress: StreamProgress) => {
+        onProgress({
+          phase: progress.phase as 'deriving_key' | 'decrypting' | 'complete',
+          progress: progress.progress ?? Math.round((progress.processedBytes / (progress.totalBytes || 1)) * 100),
+        });
+      }
+    : undefined;
+
+  // Use decryptFileStream and collect result
+  const decryptedStream = decryptFileStream(blob, {
+    password,
+    keyData,
+    onProgress: streamOnProgress,
+  });
+
+  // Convert stream to Blob
+  const response = new Response(decryptedStream);
+  return await response.blob();
 }

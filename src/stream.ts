@@ -100,13 +100,19 @@ async function encryptChunk(
 /**
  * Decrypts a single chunk with AES-GCM.
  *
+ * @description
+ * Error handling logic:
+ * - If first chunk (index 0) fails: likely wrong password/keyfile
+ * - If later chunks fail: likely data corruption
+ *
  * @internal
  */
 async function decryptChunk(
   encryptedChunk: Uint8Array,
   key: CryptoKey,
   baseIV: Uint8Array,
-  chunkIndex: number
+  chunkIndex: number,
+  isPassword: boolean
 ): Promise<Uint8Array> {
   const iv = deriveChunkIV(baseIV, chunkIndex);
 
@@ -119,6 +125,11 @@ async function decryptChunk(
 
     return new Uint8Array(plaintext);
   } catch {
+    // First chunk failure indicates wrong password/keyfile
+    // Later chunk failure indicates data corruption
+    if (chunkIndex === 0) {
+      throw new CryptoError(isPassword ? 'INVALID_PASSWORD' : 'INVALID_KEYFILE');
+    }
     throw new CryptoError('DECRYPTION_FAILED');
   }
 }
@@ -281,7 +292,7 @@ export async function createEncryptStream(options: StreamEncryptOptions): Promis
         processedBytes += toProcess.length;
 
         onProgress?.({
-          phase: 'processing',
+          phase: 'encrypting',
           processedBytes,
           processedChunks: chunkIndex,
         });
@@ -413,14 +424,14 @@ export function createDecryptStream(
         const encryptedData = buffer.slice(4, totalChunkSize);
         buffer = buffer.slice(totalChunkSize);
 
-        const decrypted = await decryptChunk(encryptedData, key!, baseIV!, chunkIndex);
+        const decrypted = await decryptChunk(encryptedData, key!, baseIV!, chunkIndex, isPasswordMode);
         controller.enqueue(decrypted);
 
         processedBytes += decrypted.length;
         chunkIndex++;
 
         onProgress?.({
-          phase: 'processing',
+          phase: 'decrypting',
           processedBytes,
           processedChunks: chunkIndex,
         });
