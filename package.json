@@ -1,6 +1,6 @@
 {
   "name": "@time-file/browser-file-crypto",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Zero-dependency file encryption for browsers using Web Crypto API",
   "type": "module",
   "main": "./dist/index.cjs",

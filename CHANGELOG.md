@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-01-02
+
+### Fixed
+
+- Fixed TypeScript strict mode errors with missing return types on callbacks
+- Removed unnecessary type assertions flagged by ESLint
+- Fixed `async flush()` method without `await` expression in `createDecryptStream`
+
 ## [1.1.1] - 2026-01-02
 
 ### Added
