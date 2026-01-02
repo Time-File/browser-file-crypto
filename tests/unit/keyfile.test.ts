@@ -159,15 +159,22 @@ describe('keyfile', () => {
       vi.restoreAllMocks();
     });
 
-    it('should create and trigger download link', () => {
+    it('should create and trigger download link with default extension', () => {
       const keyFile = generateKeyFile();
       downloadKeyFile(keyFile.key, 'my-key');
 
       expect(globalThis.document.createElement).toHaveBeenCalledWith('a');
-      expect(mockLink.download).toBe('my-key.tfkey');
+      expect(mockLink.download).toBe('my-key.key');
       expect(mockLink.click).toHaveBeenCalled();
       expect(globalThis.URL.createObjectURL).toHaveBeenCalled();
       expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+    });
+
+    it('should use custom extension when provided', () => {
+      const keyFile = generateKeyFile();
+      downloadKeyFile(keyFile.key, 'my-key', 'tfkey');
+
+      expect(mockLink.download).toBe('my-key.tfkey');
     });
 
     it('should set link display to none', () => {

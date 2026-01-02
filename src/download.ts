@@ -128,17 +128,19 @@ async function downloadWithProgress(
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let receivedLength = 0;
+  let done = false;
 
-  while (true) {
-    const { done, value } = await reader.read();
+  while (!done) {
+    const result = await reader.read();
+    done = result.done;
 
-    if (done) break;
+    if (result.value) {
+      chunks.push(result.value);
+      receivedLength += result.value.length;
 
-    chunks.push(value);
-    receivedLength += value.length;
-
-    const progress = receivedLength / contentLength;
-    onProgress(Math.min(progress, 1));
+      const progress = receivedLength / contentLength;
+      onProgress(Math.min(progress, 1));
+    }
   }
 
   // Combine chunks into single ArrayBuffer
