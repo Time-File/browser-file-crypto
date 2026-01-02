@@ -44,9 +44,10 @@
 - **Zero-Dependency** - Native Web Crypto API only
 - **AES-256-GCM** - Industry-standard authenticated encryption
 - **Password & Keyfile** - Two modes for different use cases
+- **Streaming Support** - Memory-efficient large file handling (v1.1.0+)
 - **Progress Callbacks** - Track encryption/decryption progress
 - **TypeScript** - Full type definitions
-- **Tiny** - < 4KB gzipped
+- **Tiny** - < 5KB gzipped
 
 ## Why?
 
@@ -163,6 +164,32 @@ const decrypted = await decryptFile(encrypted, {
 });
 ```
 
+### Streaming Encryption (v1.1.0+)
+
+For large files that don't fit in memory:
+
+```typescript
+import { encryptFileStream, decryptFileStream } from '@time-file/browser-file-crypto';
+
+// Encrypt large file (memory-efficient)
+const encryptedStream = await encryptFileStream(largeFile, {
+  password: 'secret',
+  chunkSize: 1024 * 1024,  // 1MB chunks (default: 64KB)
+  onProgress: ({ processedBytes, totalBytes }) => {
+    console.log(`${Math.round(processedBytes / totalBytes * 100)}%`);
+  }
+});
+
+// Convert stream to Blob
+const response = new Response(encryptedStream);
+const encryptedBlob = await response.blob();
+
+// Decrypt
+const decryptedStream = decryptFileStream(encryptedBlob, { password: 'secret' });
+const decryptResponse = new Response(decryptedStream);
+const decryptedBlob = await decryptResponse.blob();
+```
+
 ### Keyfile Mode
 
 No password to remember:
@@ -191,7 +218,7 @@ if (loaded) {
 ```typescript
 import { getEncryptionType, isEncryptedFile, generateRandomPassword } from '@time-file/browser-file-crypto';
 
-await getEncryptionType(blob);  // 'password' | 'keyfile' | 'unknown'
+await getEncryptionType(blob);  // 'password' | 'keyfile' | 'password-stream' | 'keyfile-stream' | 'unknown'
 await isEncryptedFile(blob);    // true | false
 generateRandomPassword(24);     // 'Kx9#mP2$vL5@nQ8!...'
 ```
@@ -250,6 +277,15 @@ Password-encrypted
 
 Keyfile-encrypted
 => [0x02] + [iv:12] + [ciphertext + auth_tag:16]
+
+Password-encrypted (streaming)
+=> [0x11] + [version:1] + [chunkSize:4] + [salt:16] + [baseIV:12] + [chunks...]
+
+Keyfile-encrypted (streaming)
+=> [0x12] + [version:1] + [chunkSize:4] + [baseIV:12] + [chunks...]
+
+Each streaming chunk:
+=> [chunkLength:4] + [ciphertext + auth_tag:16]
 ```
 
 ### Notes
@@ -279,7 +315,11 @@ import type {
   Progress,
   KeyFile,
   EncryptionType,
-  CryptoErrorCode
+  CryptoErrorCode,
+  // Streaming types (v1.1.0+)
+  StreamEncryptOptions,
+  StreamDecryptOptions,
+  StreamProgress
 } from '@time-file/browser-file-crypto';
 ```
 

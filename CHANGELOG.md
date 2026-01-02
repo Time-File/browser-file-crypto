@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-01-02
+
+### Added
+
+- **Streaming Encryption/Decryption** for memory-efficient large file handling
+  - `encryptFileStream` - Stream-based file encryption
+  - `decryptFileStream` - Stream-based file decryption
+  - `createEncryptStream` - Low-level encryption TransformStream
+  - `createDecryptStream` - Low-level decryption TransformStream
+  - `isStreamingEncryption` - Check if encryption type is streaming format
+- New encryption markers for streaming format (`0x11`, `0x12`)
+- Chunk-based processing with configurable chunk size (default: 64KB)
+- Independent authentication per chunk for streaming integrity
+- New types: `StreamEncryptOptions`, `StreamDecryptOptions`, `StreamProgress`
+- Constants: `DEFAULT_CHUNK_SIZE`, `STREAM_FORMAT_VERSION`
+
+### Changed
+
+- `getEncryptionType` now returns `'password-stream'` or `'keyfile-stream'` for streaming-encrypted files
+- `isEncryptedFile` now recognizes streaming format markers
+- `EncryptionType` extended with streaming types
+
 ## [1.0.0] - 2025-01-01
 
 ### Added

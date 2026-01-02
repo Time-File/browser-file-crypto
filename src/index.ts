@@ -40,10 +40,21 @@ export { encryptFile } from './encrypt';
 export { decryptFile } from './decrypt';
 
 // =============================================================================
+// Streaming Encryption/Decryption (v1.1.0)
+// =============================================================================
+
+export {
+  createEncryptStream,
+  createDecryptStream,
+  encryptFileStream,
+  decryptFileStream,
+} from './stream';
+
+// =============================================================================
 // Detection & Utilities
 // =============================================================================
 
-export { getEncryptionType, isEncryptedFile } from './detect';
+export { getEncryptionType, isEncryptedFile, isStreamingEncryption } from './detect';
 export { generateRandomPassword } from './utils';
 
 // =============================================================================
@@ -76,6 +87,12 @@ export type {
   ProgressCallback,
   KeyFile,
   EncryptionType,
+  // Streaming types (v1.1.0)
+  StreamEncryptOptions,
+  StreamDecryptOptions,
+  StreamProgress,
+  StreamProgressPhase,
+  StreamProgressCallback,
 } from './types';
 
 // =============================================================================
@@ -102,4 +119,9 @@ export {
   MIN_ENCRYPTED_SIZE_KEYFILE,
   ALGORITHM,
   HASH_ALGORITHM,
+  // Streaming constants (v1.1.0)
+  ENCRYPTION_MARKER_PASSWORD_STREAM,
+  ENCRYPTION_MARKER_KEYFILE_STREAM,
+  DEFAULT_CHUNK_SIZE,
+  STREAM_FORMAT_VERSION,
 } from './constants';

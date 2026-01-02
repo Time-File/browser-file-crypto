@@ -44,9 +44,10 @@
 - **Zero-Dependency** - 네이티브 Web Crypto API만 사용합니다.
 - **AES-256-GCM** - 업계 표준 인증 암호화 방식입니다.
 - **비밀번호 & 키파일** - 용도에 따라 두 가지 모드를 지원합니다.
+- **스트리밍 지원** - 메모리 효율적인 대용량 파일 처리 (v1.1.0+)
 - **진행률 콜백** - 암호화/복호화 진행 상황을 추적할 수 있습니다.
 - **TypeScript** - 완전한 타입 정의가 포함되어 있습니다.
-- **초경량** - gzip 압축 시 4KB 미만의 용량을 자랑합니다.
+- **초경량** - gzip 압축 시 5KB 미만의 용량을 자랑합니다.
 
 ## 왜 사용해야 하나요?
 
@@ -162,6 +163,32 @@ const decrypted = await decryptFile(encrypted, {
 });
 ```
 
+### 스트리밍 암호화 (v1.1.0+)
+
+메모리에 맞지 않는 대용량 파일을 처리할 때:
+
+```typescript
+import { encryptFileStream, decryptFileStream } from '@time-file/browser-file-crypto';
+
+// 대용량 파일 암호화 (메모리 효율적)
+const encryptedStream = await encryptFileStream(largeFile, {
+  password: 'secret',
+  chunkSize: 1024 * 1024,  // 1MB 청크 (기본값: 64KB)
+  onProgress: ({ processedBytes, totalBytes }) => {
+    console.log(`${Math.round(processedBytes / totalBytes * 100)}%`);
+  }
+});
+
+// 스트림을 Blob으로 변환
+const response = new Response(encryptedStream);
+const encryptedBlob = await response.blob();
+
+// 복호화
+const decryptedStream = decryptFileStream(encryptedBlob, { password: 'secret' });
+const decryptResponse = new Response(decryptedStream);
+const decryptedBlob = await decryptResponse.blob();
+```
+
 ### 키파일 모드
 
 비밀번호를 기억할 필요가 없습니다:
@@ -190,7 +217,7 @@ if (loaded) {
 ```typescript
 import { getEncryptionType, isEncryptedFile, generateRandomPassword } from '@time-file/browser-file-crypto';
 
-await getEncryptionType(blob);  // 'password' | 'keyfile' | 'unknown'
+await getEncryptionType(blob);  // 'password' | 'keyfile' | 'password-stream' | 'keyfile-stream' | 'unknown'
 await isEncryptedFile(blob);    // true | false
 generateRandomPassword(24);     // 'Kx9#mP2$vL5@nQ8!...'
 ```
@@ -249,6 +276,15 @@ try {
 
 키파일 암호화:
 => [0x02] + [iv:12] + [ciphertext + auth_tag:16]
+
+비밀번호 암호화 (스트리밍):
+=> [0x11] + [version:1] + [chunkSize:4] + [salt:16] + [baseIV:12] + [chunks...]
+
+키파일 암호화 (스트리밍):
+=> [0x12] + [version:1] + [chunkSize:4] + [baseIV:12] + [chunks...]
+
+각 스트리밍 청크:
+=> [chunkLength:4] + [ciphertext + auth_tag:16]
 ```
 
 ### 참고 사항
@@ -278,7 +314,11 @@ import type {
   Progress,
   KeyFile,
   EncryptionType,
-  CryptoErrorCode
+  CryptoErrorCode,
+  // 스트리밍 타입 (v1.1.0+)
+  StreamEncryptOptions,
+  StreamDecryptOptions,
+  StreamProgress
 } from '@time-file/browser-file-crypto';
 ```
 

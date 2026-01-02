@@ -165,6 +165,88 @@ export interface KeyFile {
  * @description
  * - `password`: File was encrypted with a password (marker byte 0x01)
  * - `keyfile`: File was encrypted with a keyfile (marker byte 0x02)
+ * - `password-stream`: File was encrypted with password streaming (marker byte 0x11)
+ * - `keyfile-stream`: File was encrypted with keyfile streaming (marker byte 0x12)
  * - `unknown`: Unrecognized format or not encrypted with this library
  */
-export type EncryptionType = 'password' | 'keyfile' | 'unknown';
+export type EncryptionType =
+  | 'password'
+  | 'keyfile'
+  | 'password-stream'
+  | 'keyfile-stream'
+  | 'unknown';
+
+// =============================================================================
+// Streaming Encryption Types (v1.1.0)
+// =============================================================================
+
+/**
+ * Progress phase during streaming encryption/decryption operations.
+ *
+ * @since 1.1.0
+ */
+export type StreamProgressPhase = 'deriving_key' | 'processing' | 'complete';
+
+/**
+ * Progress information for streaming encryption/decryption operations.
+ *
+ * @since 1.1.0
+ */
+export interface StreamProgress {
+  /** Current phase of the operation */
+  phase: StreamProgressPhase;
+
+  /** Number of bytes processed so far */
+  processedBytes: number;
+
+  /** Total bytes to process (undefined if unknown, e.g., for streams) */
+  totalBytes?: number;
+
+  /** Number of chunks processed so far */
+  processedChunks: number;
+
+  /** Progress percentage (0-100), only available when totalBytes is known */
+  progress?: number;
+}
+
+/**
+ * Callback function for streaming progress updates.
+ *
+ * @since 1.1.0
+ */
+export type StreamProgressCallback = (progress: StreamProgress) => void;
+
+/**
+ * Options for streaming file encryption.
+ *
+ * @since 1.1.0
+ */
+export interface StreamEncryptOptions {
+  /** Password for encryption (required if keyData not provided) */
+  password?: string;
+
+  /** Base64-encoded key data from keyfile (required if password not provided) */
+  keyData?: string;
+
+  /** Chunk size in bytes (default: 65536 = 64KB) */
+  chunkSize?: number;
+
+  /** Progress callback for UI updates */
+  onProgress?: StreamProgressCallback;
+}
+
+/**
+ * Options for streaming file decryption.
+ *
+ * @since 1.1.0
+ */
+export interface StreamDecryptOptions {
+  /** Password for decryption (required for password-encrypted files) */
+  password?: string;
+
+  /** Base64-encoded key data (required for keyfile-encrypted files) */
+  keyData?: string;
+
+  /** Progress callback for UI updates */
+  onProgress?: StreamProgressCallback;
+}

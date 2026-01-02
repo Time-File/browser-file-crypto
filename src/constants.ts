@@ -50,6 +50,32 @@ export const ENCRYPTION_MARKER_PASSWORD = 0x01;
 export const ENCRYPTION_MARKER_KEYFILE = 0x02;
 
 /**
+ * Encryption marker byte for password-based streaming encryption.
+ * Used to identify streaming encryption with password.
+ * @since 1.1.0
+ */
+export const ENCRYPTION_MARKER_PASSWORD_STREAM = 0x11;
+
+/**
+ * Encryption marker byte for keyfile-based streaming encryption.
+ * Used to identify streaming encryption with keyfile.
+ * @since 1.1.0
+ */
+export const ENCRYPTION_MARKER_KEYFILE_STREAM = 0x12;
+
+/**
+ * Default chunk size for streaming encryption (64KB).
+ * @since 1.1.0
+ */
+export const DEFAULT_CHUNK_SIZE = 64 * 1024;
+
+/**
+ * Streaming format version.
+ * @since 1.1.0
+ */
+export const STREAM_FORMAT_VERSION = 0x01;
+
+/**
  * AES-GCM authentication tag length in bytes.
  * 16 bytes (128 bits) is the default and recommended tag size.
  */
