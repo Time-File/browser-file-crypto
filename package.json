@@ -14,7 +14,11 @@
     }
   },
   "files": [
-    "dist"
+    "dist/*.js",
+    "dist/*.mjs",
+    "dist/*.cjs",
+    "dist/*.d.ts",
+    "dist/*.map"
   ],
   "sideEffects": false,
   "scripts": {
