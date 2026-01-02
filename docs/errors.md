@@ -213,7 +213,9 @@ try {
 }
 ```
 
-### Streaming Decryption Errors
+### Streaming Decryption Errors (v1.1.1+)
+
+Streaming decryption distinguishes between wrong password/keyfile and data corruption:
 
 ```typescript
 import { decryptFileStream } from '@time-file/browser-file-crypto';
@@ -221,8 +223,20 @@ import { decryptFileStream } from '@time-file/browser-file-crypto';
 try {
   const stream = decryptFileStream(encryptedBlob, { password: 'wrong' });
   const response = new Response(stream);
-  await response.blob(); // Error thrown during stream processing
+  await response.blob();
 } catch (error) {
-  // error.code === 'INVALID_PASSWORD' or 'DECRYPTION_FAILED'
+  if (error.code === 'INVALID_PASSWORD') {
+    // Wrong password (first chunk failed)
+  } else if (error.code === 'INVALID_KEYFILE') {
+    // Wrong keyfile (first chunk failed)
+  } else if (error.code === 'DECRYPTION_FAILED') {
+    // Data corruption (later chunk failed)
+  }
 }
 ```
+
+| Error Code | Cause |
+|------------|-------|
+| `INVALID_PASSWORD` | First chunk decryption failed (wrong password) |
+| `INVALID_KEYFILE` | First chunk decryption failed (wrong keyfile) |
+| `DECRYPTION_FAILED` | Later chunk decryption failed (data corruption) |

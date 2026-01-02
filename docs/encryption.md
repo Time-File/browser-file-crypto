@@ -58,6 +58,8 @@ const encrypted = await encryptFile(file, {
 
 Decrypts a file that was encrypted with `encryptFile`.
 
+> **Note (v1.1.1+)**: This function now automatically detects and handles streaming-encrypted files. No need to manually check the format or use `decryptFileStream` for basic use cases.
+
 ### Parameters
 
 | Parameter | Type | Description |

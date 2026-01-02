@@ -145,13 +145,21 @@ await encryptedStream.pipeThrough(decryptStream).pipeTo(outputStream);
 
 ```typescript
 interface StreamProgress {
-  phase: 'deriving_key' | 'processing' | 'complete';
+  phase: 'deriving_key' | 'encrypting' | 'decrypting' | 'downloading' | 'complete';
   processedBytes: number;     // Total bytes processed
   totalBytes?: number;        // Total size (if known)
   processedChunks: number;    // Number of chunks processed
   progress?: number;          // 0-100 percentage (if totalBytes known)
 }
 ```
+
+| Phase | Description |
+|-------|-------------|
+| `deriving_key` | PBKDF2 key derivation in progress |
+| `encrypting` | Streaming encryption in progress |
+| `decrypting` | Streaming decryption in progress |
+| `downloading` | File download in progress (`downloadAndDecryptStream`) |
+| `complete` | Operation finished |
 
 ---
 
@@ -198,6 +206,73 @@ if (isStreamingEncryption(type)) {
   // Use decryptFile
 }
 ```
+
+> **Note (v1.1.1+)**: `decryptFile()` now automatically detects streaming-encrypted files and delegates to the streaming API. You no longer need to check the format manually for basic use cases.
+
+---
+
+## Hybrid Encryption (v1.1.1+)
+
+### `encryptFileAuto(file, options)`
+
+Automatically switches between standard and streaming encryption based on file size.
+
+```typescript
+import { encryptFileAuto } from '@time-file/browser-file-crypto';
+
+const encrypted = await encryptFileAuto(largeFile, {
+  password: 'secret',
+  autoStreaming: true,           // Enable auto-switching
+  streamingThreshold: 100 * 1024 * 1024,  // 100MB (default)
+  chunkSize: 1024 * 1024,        // 1MB chunks for streaming
+  onProgress: ({ phase, progress }) => {
+    console.log(`${phase}: ${progress}%`);
+  }
+});
+
+// decryptFile automatically handles both formats
+const decrypted = await decryptFile(encrypted, { password: 'secret' });
+```
+
+#### AutoEncryptOptions
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `password` | `string` | - | Password for encryption |
+| `keyData` | `string` | - | Base64-encoded keyfile key |
+| `onProgress` | `ProgressCallback` | - | Progress callback |
+| `autoStreaming` | `boolean` | `false` | Enable auto-switching |
+| `streamingThreshold` | `number` | `104857600` (100MB) | Size threshold for streaming |
+| `chunkSize` | `number` | `65536` (64KB) | Chunk size when streaming |
+
+---
+
+## Download & Decrypt Stream (v1.1.1+)
+
+### `downloadAndDecryptStream(url, options)`
+
+Downloads and decrypts a streaming-encrypted file from a URL.
+
+```typescript
+import { downloadAndDecryptStream } from '@time-file/browser-file-crypto';
+
+await downloadAndDecryptStream('https://example.com/large-file.enc', {
+  password: 'secret',
+  fileName: 'video.mp4',
+  onProgress: ({ phase, processedBytes, progress }) => {
+    console.log(`${phase}: ${progress}%`);
+  }
+});
+```
+
+#### DownloadDecryptStreamOptions
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `fileName` | `string` | Yes | Name for the downloaded file |
+| `password` | `string` | One of | Password for decryption |
+| `keyData` | `string` | One of | Base64-encoded keyfile key |
+| `onProgress` | `StreamProgressCallback` | No | Progress callback |
 
 ---
 
