@@ -1,12 +1,18 @@
 # @time-file/browser-file-crypto
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image.png#gh-light-mode-only" alt="browser-file-crypto" width="100%" />
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image-dark.png#gh-dark-mode-only" alt="browser-file-crypto" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image.png" alt="browser-file-crypto" width="100%" />
+  </picture>
 </p>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/encryption-structure.png#gh-light-mode-only" alt="Encryption Flow" width="100%" />
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/encryption-structure-dark.png#gh-dark-mode-only" alt="Encryption Flow" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/encryption-structure-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/encryption-structure.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/encryption-structure.png" alt="Encryption Flow" width="100%" />
+  </picture>
 </p>
 
 <p align="center">
@@ -21,14 +27,17 @@
 </p>
 
 <p align="center">
-  <strong>English</strong> | <a href="./README.ko.md">한국어</a>
+  <strong>English</strong> | <a href="https://github.com/Time-File/browser-file-crypto/blob/main/README.ko.md">한국어</a>
 </p>
 
 ## Features
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid.png#gh-light-mode-only" alt="Features" width="100%" />
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid-dark.png#gh-dark-mode-only" alt="Features" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid.png" alt="Features" width="100%" />
+  </picture>
 </p>
 
 - **Zero-Knowledge** - Client-side encryption, server never sees plaintext
@@ -104,9 +113,14 @@ const decrypted = await decryptFile(encrypted, { password: 'secret' });
 ## Install
 
 ```bash
+# npm
 npm install @time-file/browser-file-crypto
-# or
+
+# pnpm
 pnpm add @time-file/browser-file-crypto
+
+# yarn
+yarn add @time-file/browser-file-crypto
 ```
 
 ## Quick Start
@@ -223,8 +237,11 @@ try {
 ### File Format
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format.png#gh-light-mode-only" alt="File Format" width="100%" />
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format-dark.png#gh-dark-mode-only" alt="File Format" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format.png" alt="File Format" width="100%" />
+  </picture>
 </p>
 
 ```
@@ -281,7 +298,10 @@ import type {
 
 <p align="center">
   <a href="https://timefile.co/en">
-    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer.png#gh-light-mode-only" alt="Made by timefile.co" />
-    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer-dark.png#gh-dark-mode-only" alt="Made by timefile.co" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer-dark.png" />
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer.png" />
+      <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer.png" alt="Made by timefile.co" />
+    </picture>
   </a>
 </p>
