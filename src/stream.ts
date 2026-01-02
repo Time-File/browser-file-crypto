@@ -91,7 +91,7 @@ async function encryptChunk(
 
   // Format: [4 bytes chunk length (LE)] + [ciphertext + auth tag]
   const result = new Uint8Array(4 + ciphertext.byteLength);
-  new DataView(result.buffer as ArrayBuffer).setUint32(0, ciphertext.byteLength, true);
+  new DataView(result.buffer, result.byteOffset, result.byteLength).setUint32(0, ciphertext.byteLength, true);
   result.set(new Uint8Array(ciphertext), 4);
 
   return result;
@@ -265,9 +265,15 @@ export async function createEncryptStream(options: StreamEncryptOptions): Promis
     processedChunks: 0,
   });
 
-  const key = isPassword
-    ? await deriveKeyFromPassword(password!, salt!)
-    : await importKeyFromKeyfile(keyData!);
+  // Derive or import key based on authentication method
+  let key: CryptoKey;
+  if (password && salt) {
+    key = await deriveKeyFromPassword(password, salt);
+  } else if (keyData) {
+    key = await importKeyFromKeyfile(keyData);
+  } else {
+    throw new CryptoError('PASSWORD_REQUIRED');
+  }
 
   // Create header
   const header = createStreamHeader(isPassword, chunkSize, salt, baseIV);
@@ -278,8 +284,8 @@ export async function createEncryptStream(options: StreamEncryptOptions): Promis
   let processedBytes = 0;
 
   const stream = new TransformStream<Uint8Array, Uint8Array>({
-    async transform(chunk, controller) {
-      buffer = concatArrays(buffer, chunk) as Uint8Array;
+    async transform(chunk, controller): Promise<void> {
+      buffer = concatArrays(buffer, chunk);
 
       while (buffer.length >= chunkSize) {
         const toProcess = buffer.slice(0, chunkSize);
@@ -299,7 +305,7 @@ export async function createEncryptStream(options: StreamEncryptOptions): Promis
       }
     },
 
-    async flush(controller) {
+    async flush(controller): Promise<void> {
       // Process remaining buffer (last chunk)
       if (buffer.length > 0) {
         const encrypted = await encryptChunk(buffer, key, baseIV, chunkIndex);
@@ -363,8 +369,8 @@ export function createDecryptStream(
   let headerSize = 0;
 
   return new TransformStream<Uint8Array, Uint8Array>({
-    async transform(chunk, controller) {
-      buffer = concatArrays(buffer, chunk) as Uint8Array;
+    async transform(chunk, controller): Promise<void> {
+      buffer = concatArrays(buffer, chunk);
 
       // Parse header if not yet done
       if (!headerParsed) {
@@ -438,7 +444,7 @@ export function createDecryptStream(
       }
     },
 
-    async flush() {
+    flush(): void {
       // Any remaining data should have been processed
       if (buffer.length > 0) {
         throw new CryptoError('INVALID_ENCRYPTED_DATA');
@@ -495,16 +501,16 @@ export async function encryptFileStream(
 
   // Wrap onProgress to include totalBytes
   const wrappedOnProgress = options.onProgress
-    ? (progress: StreamProgress) => {
-        options.onProgress!({
-          ...progress,
-          totalBytes,
-          progress:
-            progress.phase === 'complete'
-              ? 100
-              : Math.round((progress.processedBytes / totalBytes) * 100),
-        });
-      }
+    ? (progress: StreamProgress): void => {
+      options.onProgress!({
+        ...progress,
+        totalBytes,
+        progress:
+          progress.phase === 'complete'
+            ? 100
+            : Math.round((progress.processedBytes / totalBytes) * 100),
+      });
+    }
     : undefined;
 
   const { stream, header } = await createEncryptStream({
@@ -521,7 +527,7 @@ export async function encryptFileStream(
   const reader = encryptedDataStream.getReader();
 
   return new ReadableStream<Uint8Array>({
-    async pull(controller) {
+    async pull(controller): Promise<void> {
       // Send header first
       if (!headerSent) {
         controller.enqueue(header);
@@ -542,7 +548,7 @@ export async function encryptFileStream(
       }
     },
 
-    cancel() {
+    cancel(): void {
       reader.releaseLock();
     },
   });

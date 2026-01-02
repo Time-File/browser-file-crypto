@@ -243,12 +243,12 @@ export async function encryptFileAuto(
   if (useStreaming) {
     // Use streaming encryption for large files
     const streamOnProgress = onProgress
-      ? (progress: StreamProgress) => {
-          onProgress({
-            phase: progress.phase as 'deriving_key' | 'encrypting' | 'complete',
-            progress: progress.progress ?? Math.round((progress.processedBytes / file.size) * 100),
-          });
-        }
+      ? (progress: StreamProgress): void => {
+        onProgress({
+          phase: progress.phase as 'deriving_key' | 'encrypting' | 'complete',
+          progress: progress.progress ?? Math.round((progress.processedBytes / file.size) * 100),
+        });
+      }
       : undefined;
 
     const encryptedStream = await encryptFileStream(file, {

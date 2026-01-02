@@ -226,12 +226,12 @@ async function decryptStreamingFormat(
 
   // Map StreamProgress callback to Progress callback
   const streamOnProgress = onProgress
-    ? (progress: StreamProgress) => {
-        onProgress({
-          phase: progress.phase as 'deriving_key' | 'decrypting' | 'complete',
-          progress: progress.progress ?? Math.round((progress.processedBytes / (progress.totalBytes || 1)) * 100),
-        });
-      }
+    ? (progress: StreamProgress): void => {
+      onProgress({
+        phase: progress.phase as 'deriving_key' | 'decrypting' | 'complete',
+        progress: progress.progress ?? Math.round((progress.processedBytes / (progress.totalBytes || 1)) * 100),
+      });
+    }
     : undefined;
 
   // Use decryptFileStream and collect result
