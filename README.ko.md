@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">English</a> | <strong>한국어</strong>
+  <a href="https://github.com/Time-File/browser-file-crypto/blob/main/README.md">English</a> | <strong>한국어</strong>
 </p>
 
 ## 특징
