@@ -9,14 +9,20 @@
   <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/encryption-structure-dark.png#gh-dark-mode-only" alt="Encryption Flow" width="100%" />
 </p>
 
-Zero-dependency file encryption for browsers using Web Crypto API.
+<p align="center">
+  Zero-dependency file encryption for browsers using Web Crypto API.
+</p>
 
-[![npm version](https://img.shields.io/npm/v/@time-file/browser-file-crypto.svg)](https://www.npmjs.com/package/@time-file/browser-file-crypto)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@time-file/browser-file-crypto)](https://bundlephobia.com/package/@time-file/browser-file-crypto)
-[![stars](https://img.shields.io/github/stars/time-file/browser-file-crypto?style=flat)](https://github.com/time-file/browser-file-crypto/stargazers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+<p align="center">
+  <a href="https://www.npmjs.com/package/@time-file/browser-file-crypto"><img src="https://img.shields.io/npm/v/@time-file/browser-file-crypto.svg" alt="npm version" /></a>
+  <a href="https://bundlephobia.com/package/@time-file/browser-file-crypto"><img src="https://img.shields.io/bundlephobia/minzip/@time-file/browser-file-crypto" alt="bundle size" /></a>
+  <a href="https://github.com/time-file/browser-file-crypto/stargazers"><img src="https://img.shields.io/github/stars/time-file/browser-file-crypto?style=flat" alt="stars" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+</p>
 
-**English** | [한국어](./README.ko.md)
+<p align="center">
+  <strong>English</strong> | <a href="./README.ko.md">한국어</a>
+</p>
 
 ## Features
 

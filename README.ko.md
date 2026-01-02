@@ -7,14 +7,20 @@
   <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/hero.ko.png" alt="Hero" width="100%" />
 </p>
 
-Web Crypto API 기반의 브라우저 파일 암호화 라이브러리입니다.
+<p align="center">
+  Web Crypto API 기반의 브라우저 파일 암호화 라이브러리입니다.
+</p>
 
-[![npm version](https://img.shields.io/npm/v/@time-file/browser-file-crypto.svg)](https://www.npmjs.com/package/@time-file/browser-file-crypto)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@time-file/browser-file-crypto)](https://bundlephobia.com/package/@time-file/browser-file-crypto)
-[![stars](https://img.shields.io/github/stars/time-file/browser-file-crypto?style=flat)](https://github.com/time-file/browser-file-crypto/stargazers)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+<p align="center">
+  <a href="https://www.npmjs.com/package/@time-file/browser-file-crypto"><img src="https://img.shields.io/npm/v/@time-file/browser-file-crypto.svg" alt="npm version" /></a>
+  <a href="https://bundlephobia.com/package/@time-file/browser-file-crypto"><img src="https://img.shields.io/bundlephobia/minzip/@time-file/browser-file-crypto" alt="bundle size" /></a>
+  <a href="https://github.com/time-file/browser-file-crypto/stargazers"><img src="https://img.shields.io/github/stars/time-file/browser-file-crypto?style=flat" alt="stars" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+</p>
 
-[English](./README.md) | **한국어**
+<p align="center">
+  <a href="./README.md">English</a> | <strong>한국어</strong>
+</p>
 
 ## 특징
 
