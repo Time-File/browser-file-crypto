@@ -1,10 +1,18 @@
 # @time-file/browser-file-crypto
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image.png" alt="browser-file-crypto" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/og-image.png" alt="browser-file-crypto" width="100%" />
+  </picture>
 </p>
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/hero.ko.png" alt="Hero" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/hero-dark.ko.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/hero.ko.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/hero.ko.png" alt="Hero" width="100%" />
+  </picture>
 </p>
 
 <p align="center">
@@ -25,7 +33,11 @@
 ## 특징
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid.ko.png" alt="Features" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid-dark.ko.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid.ko.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/features-grid.ko.png" alt="Features" width="100%" />
+  </picture>
 </p>
 
 - **Zero-Knowledge** - 클라이언트 측 암호화로 서버는 평문을 볼 수 없습니다.
@@ -100,9 +112,14 @@ const decrypted = await decryptFile(encrypted, { password: 'secret' });
 ## 설치
 
 ```bash
+# npm
 npm install @time-file/browser-file-crypto
-# or
+
+# pnpm
 pnpm add @time-file/browser-file-crypto
+
+# yarn
+yarn add @time-file/browser-file-crypto
 ```
 
 ## 빠른 시작
@@ -219,7 +236,11 @@ try {
 ### 파일 포맷
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format.ko.png" alt="File Format" width="100%" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format-dark.ko.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format.ko.png" />
+    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/file-format.ko.png" alt="File Format" width="100%" />
+  </picture>
 </p>
 
 ```
@@ -276,7 +297,10 @@ import type {
 
 <p align="center">
   <a href="https://timefile.co/ko">
-    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer.ko.png#gh-light-mode-only" alt="Made by timefile.co" />
-    <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer-dark.ko.png#gh-dark-mode-only" alt="Made by timefile.co" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer-dark.ko.png" />
+      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer.ko.png" />
+      <img src="https://raw.githubusercontent.com/Time-File/browser-file-crypto/refs/heads/main/public/timefile-footer.ko.png" alt="Made by timefile.co" />
+    </picture>
   </a>
 </p>
