@@ -102,7 +102,7 @@ const decrypted = await decryptFile(encrypted, { password: 'secret' });
 | 기능 | crypto-js | @aws-crypto | Web Crypto (직접) | **browser-file-crypto** |
 |------|-----------|-------------|-------------------|------------------------|
 | 유지보수 | ❌ 중단됨 | ✅ | - | ✅ |
-| 번들 크기 | ~50KB | ~200KB+ | 0 | **< 4KB** |
+| 번들 크기 | ~50KB | ~200KB+ | 0 | **< 5KB** |
 | 의존성 | 많음 | 많음 | 없음 | **없음** |
 | 파일 특화 API | ❌ | ⚠️ | ❌ | **✅** |
 | 진행률 콜백 | ❌ | ❌ | ❌ | **✅** |

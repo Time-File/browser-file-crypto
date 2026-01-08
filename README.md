@@ -103,7 +103,7 @@ const decrypted = await decryptFile(encrypted, { password: 'secret' });
 | Feature | crypto-js | @aws-crypto | Web Crypto (direct) | **browser-file-crypto** |
 |---------|-----------|-------------|---------------------|------------------------|
 | Maintained | ❌ Deprecated | ✅ | - | ✅ |
-| Bundle size | ~50KB | ~200KB+ | 0 | **< 4KB** |
+| Bundle size | ~50KB | ~200KB+ | 0 | **< 5KB** |
 | Dependencies | Many | Many | None | **None** |
 | File-focused API | ❌ | ⚠️ | ❌ | **✅** |
 | Progress callbacks | ❌ | ❌ | ❌ | **✅** |
