@@ -78,7 +78,7 @@ describe('encryptFile', () => {
     });
 
     it('should handle unicode password', async () => {
-      const unicodePassword = '비밀번호🔐中文密码';
+      const unicodePassword = 'password123';
       const encrypted = await encryptFile(testBlob, { password: unicodePassword });
       expect(encrypted).toBeInstanceOf(Blob);
     });

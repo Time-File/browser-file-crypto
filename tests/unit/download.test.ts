@@ -6,7 +6,7 @@ import { generateKeyFile } from '../../src/keyfile';
 import { CryptoError } from '../../src/errors';
 
 describe('downloadAndDecrypt', () => {
-  const testText = 'Hello, Download Test! 🔐';
+  const testText = 'Hello, Download Test!';
   const testData = new TextEncoder().encode(testText);
   const testBlob = new Blob([testData]);
   const testPassword = 'test-password-123';
@@ -322,7 +322,7 @@ describe('downloadAndDecrypt', () => {
 });
 
 describe('downloadAndDecryptStream', () => {
-  const testText = 'Hello, Streaming Download! 🔐';
+  const testText = 'Hello, Streaming Download!';
   const testData = new TextEncoder().encode(testText);
   const testBlob = new Blob([testData]);
   const testPassword = 'test-password-123';

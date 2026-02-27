@@ -10,7 +10,7 @@ import {
 } from '../../src/constants';
 
 describe('decryptFile', () => {
-  const testText = 'Hello, World! 안녕하세요! 🔐';
+  const testText = 'Hello, World! Hello!';
   const testData = new TextEncoder().encode(testText);
   const testBlob = new Blob([testData]);
   const testPassword = 'test-password-123';

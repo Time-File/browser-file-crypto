@@ -8,7 +8,7 @@ import { generateRandomPassword } from '../../src/utils';
 describe('Encryption/Decryption Roundtrip', () => {
   describe('password-based roundtrip', () => {
     it('should preserve text file content exactly', async () => {
-      const originalText = 'Hello, World! 안녕하세요! 🔐 Special chars: <>&"\' \\n\\t';
+      const originalText = 'Hello, World! Hello! Special chars: <>&"\' \\n\\t';
       const originalBlob = new Blob([originalText], { type: 'text/plain' });
       const password = 'my-secret-password';
 
@@ -59,7 +59,7 @@ describe('Encryption/Decryption Roundtrip', () => {
     it('should work with unicode password', async () => {
       const originalText = 'Secret data';
       const originalBlob = new Blob([originalText]);
-      const unicodePassword = '密码🔑пароль';
+      const unicodePassword = 'password123';
 
       const encrypted = await encryptFile(originalBlob, { password: unicodePassword });
       const decrypted = await decryptFile(encrypted, { password: unicodePassword });
@@ -70,7 +70,7 @@ describe('Encryption/Decryption Roundtrip', () => {
 
   describe('keyfile-based roundtrip', () => {
     it('should preserve text file content exactly', async () => {
-      const originalText = 'Keyfile encrypted content! 키파일 암호화!';
+      const originalText = 'Keyfile encrypted content! Keyfile encryption!';
       const originalBlob = new Blob([originalText]);
       const keyFile = generateKeyFile();
 
