@@ -13,7 +13,7 @@ import {
   ALGORITHM,
   DEFAULT_CHUNK_SIZE,
 } from './constants';
-import { CryptoError } from './errors';
+import { CryptoError, toCryptoError } from './errors';
 import type { EncryptOptions, AutoEncryptOptions, StreamProgress } from './types';
 import {
   normalizeInput,
@@ -93,10 +93,7 @@ export async function encryptFile(
       return await encryptWithPassword(data, password!, onProgress);
     }
   } catch (error) {
-    if (error instanceof CryptoError) {
-      throw error;
-    }
-    throw new CryptoError('ENCRYPTION_FAILED');
+    throw toCryptoError(error, 'ENCRYPTION_FAILED');
   }
 }
 

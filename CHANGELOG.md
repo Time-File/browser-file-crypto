@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-14
+
+### Changed
+
+- **`downloadAndDecrypt` streams streaming-encrypted files** - The response body is decrypted while it downloads instead of being buffered whole, so large files no longer hold the full ciphertext (plus a combined copy) in memory. Single-shot files are buffered once into a pre-sized buffer.
+- **`downloadAndDecryptStream` decrypts the response body directly** instead of reading it into a Blob first.
+- Download progress is emitted once per percentage point instead of once per network chunk, and only moves forward. Streaming-encrypted downloads report `downloading` 0-95% (decryption runs in parallel), then `complete`.
+- The saved file's object URL is revoked after 40 seconds instead of immediately after `click()`, which could cancel large saves in Safari and Firefox.
+- Streaming decryption no longer re-copies the remaining buffer once per encrypted chunk when a network read contains many chunks.
+
+### Added
+
+- `CryptoError` accepts `{ cause }` and keeps the original failure. `DOWNLOAD_FAILED`, `DECRYPTION_FAILED` and `ENCRYPTION_FAILED` raised for unexpected errors (network drops, stream errors, memory allocation failures) now carry the original error as `error.cause`.
+
+### Fixed
+
+- Wrong password/keyfile on a streaming-encrypted file now reports `INVALID_PASSWORD` / `INVALID_KEYFILE` in browsers. Chromium rejects `Response#blob()` with a generic `TypeError` when the source stream errors, which previously surfaced as `DECRYPTION_FAILED` (`decryptFile`) or `DOWNLOAD_FAILED` (`downloadAndDecryptStream`).
+
 ## [1.1.2] - 2026-01-02
 
 ### Fixed

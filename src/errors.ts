@@ -84,15 +84,33 @@ export class CryptoError extends Error {
   readonly code: CryptoErrorCode;
 
   /**
+   * The underlying error that caused this one, when a lower-level failure
+   * (network, stream, memory, Web Crypto) was wrapped into a CryptoError.
+   *
+   * @since 1.2.0
+   */
+  declare readonly cause?: unknown;
+
+  /**
    * Creates a new CryptoError.
    *
    * @param code - Error code identifying the type of error
    * @param message - Optional custom message (defaults to predefined message)
+   * @param options - Optional `cause` preserving the original failure (since 1.2.0)
    */
-  constructor(code: CryptoErrorCode, message?: string) {
+  constructor(code: CryptoErrorCode, message?: string, options?: { cause?: unknown }) {
     super(message ?? ERROR_MESSAGES[code]);
     this.name = 'CryptoError';
     this.code = code;
+
+    if (options && 'cause' in options) {
+      Object.defineProperty(this, 'cause', {
+        value: options.cause,
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      });
+    }
 
     // Maintains proper stack trace in V8 environments (Chrome, Node.js)
     if (Error.captureStackTrace) {
@@ -120,4 +138,17 @@ export class CryptoError extends Error {
  */
 export function isCryptoError(error: unknown): error is CryptoError {
   return error instanceof CryptoError;
+}
+
+/**
+ * Returns `error` unchanged when it is already a CryptoError, otherwise wraps
+ * it in a CryptoError with the given code and keeps the original as `cause`.
+ *
+ * @internal
+ */
+export function toCryptoError(error: unknown, code: CryptoErrorCode): CryptoError {
+  if (error instanceof CryptoError) {
+    return error;
+  }
+  return new CryptoError(code, undefined, { cause: error });
 }

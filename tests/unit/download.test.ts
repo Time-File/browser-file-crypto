@@ -71,17 +71,25 @@ describe('downloadAndDecrypt', () => {
         arrayBuffer: () => Promise.resolve(encryptedBuffer),
       });
 
-      await downloadAndDecrypt('https://example.com/file.enc', {
-        password: testPassword,
-        fileName: testFileName,
-      });
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      try {
+        await downloadAndDecrypt('https://example.com/file.enc', {
+          password: testPassword,
+          fileName: testFileName,
+        });
 
-      expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com/file.enc');
-      expect(globalThis.document.createElement).toHaveBeenCalledWith('a');
-      expect(mockLink.download).toBe(testFileName);
-      expect(mockLink.click).toHaveBeenCalled();
-      expect(globalThis.URL.createObjectURL).toHaveBeenCalled();
-      expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+        expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com/file.enc');
+        expect(globalThis.document.createElement).toHaveBeenCalledWith('a');
+        expect(mockLink.download).toBe(testFileName);
+        expect(mockLink.click).toHaveBeenCalled();
+        expect(globalThis.URL.createObjectURL).toHaveBeenCalled();
+        // Revoking in the same task as click() can cancel the save in Safari/Firefox.
+        expect(globalThis.URL.revokeObjectURL).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(40_000);
+        expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url');
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should download, decrypt, and save keyfile-encrypted file', async () => {
