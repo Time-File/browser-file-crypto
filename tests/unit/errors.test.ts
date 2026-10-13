@@ -25,6 +25,20 @@ describe('CryptoError', () => {
       expect(error).toBeInstanceOf(CryptoError);
     });
 
+    it('should keep the underlying error as cause', () => {
+      const original = new TypeError('Load failed');
+      const error = new CryptoError('DOWNLOAD_FAILED', undefined, { cause: original });
+
+      expect(error.cause).toBe(original);
+      expect(error.message).toBe('File download failed.');
+    });
+
+    it('should not define cause when none is given', () => {
+      const error = new CryptoError('DOWNLOAD_FAILED');
+
+      expect('cause' in error).toBe(false);
+    });
+
     it('should have stack trace', () => {
       const error = new CryptoError('ENCRYPTION_FAILED');
 

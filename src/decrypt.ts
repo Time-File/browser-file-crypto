@@ -16,7 +16,7 @@ import {
   MIN_ENCRYPTED_SIZE_KEYFILE,
   ALGORITHM,
 } from './constants';
-import { CryptoError } from './errors';
+import { CryptoError, toCryptoError } from './errors';
 import type { DecryptOptions, StreamProgress } from './types';
 import {
   normalizeInput,
@@ -24,7 +24,7 @@ import {
   deriveKeyFromPassword,
   importKeyFromKeyfile,
 } from './utils';
-import { decryptFileStream } from './stream';
+import { decryptFileStream, streamToBlob } from './stream';
 
 /**
  * Decrypts a file that was encrypted with encryptFile.
@@ -117,10 +117,7 @@ export async function decryptFile(
       throw new CryptoError('UNSUPPORTED_FORMAT');
     }
   } catch (error) {
-    if (error instanceof CryptoError) {
-      throw error;
-    }
-    throw new CryptoError('DECRYPTION_FAILED');
+    throw toCryptoError(error, 'DECRYPTION_FAILED');
   }
 }
 
@@ -241,7 +238,6 @@ async function decryptStreamingFormat(
     onProgress: streamOnProgress,
   });
 
-  // Convert stream to Blob
-  const response = new Response(decryptedStream);
-  return await response.blob();
+  // Convert stream to Blob, keeping the decrypt stream's own error
+  return await streamToBlob(decryptedStream);
 }

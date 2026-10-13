@@ -64,6 +64,7 @@ function deriveChunkIV(baseIV: Uint8Array, chunkIndex: number): Uint8Array {
  * @internal
  */
 function concatArrays(a: Uint8Array, b: Uint8Array): Uint8Array {
+  if (a.length === 0) return b;
   const result = new Uint8Array(a.length + b.length);
   result.set(a, 0);
   result.set(b, a.length);
@@ -417,18 +418,21 @@ export function createDecryptStream(
       }
 
       // Process complete chunks
-      // Each encrypted chunk: 4 bytes length + ciphertext + 16 bytes auth tag
-      while (buffer.length >= 4) {
+      // Each encrypted chunk: 4 bytes length + ciphertext + 16 bytes auth tag.
+      // Walk an offset over the buffer and keep only the unconsumed tail, so a
+      // large network read is not re-copied once per encrypted chunk.
+      let offset = 0;
+      while (buffer.length - offset >= 4) {
         const encryptedChunkSize = new DataView(
           buffer.buffer as ArrayBuffer,
-          buffer.byteOffset
+          buffer.byteOffset + offset
         ).getUint32(0, true);
         const totalChunkSize = 4 + encryptedChunkSize;
 
-        if (buffer.length < totalChunkSize) break;
+        if (buffer.length - offset < totalChunkSize) break;
 
-        const encryptedData = buffer.slice(4, totalChunkSize);
-        buffer = buffer.slice(totalChunkSize);
+        const encryptedData = buffer.subarray(offset + 4, offset + totalChunkSize);
+        offset += totalChunkSize;
 
         const decrypted = await decryptChunk(encryptedData, key!, baseIV!, chunkIndex, isPasswordMode);
         controller.enqueue(decrypted);
@@ -441,6 +445,10 @@ export function createDecryptStream(
           processedBytes,
           processedChunks: chunkIndex,
         });
+      }
+
+      if (offset > 0) {
+        buffer = buffer.slice(offset);
       }
     },
 
@@ -594,4 +602,48 @@ export function decryptFileStream(
   }
 
   return (encrypted.stream() as ReadableStream<Uint8Array>).pipeThrough(stream);
+}
+
+/**
+ * Collects a byte stream into a Blob, rethrowing the stream's own error.
+ *
+ * @description
+ * `Response#blob()` lets the browser keep large results out of the JS heap
+ * (Chromium and Firefox page big blobs to disk), but some engines reject it
+ * with a generic `TypeError` when the source stream errors. The original
+ * failure (for example `INVALID_PASSWORD` from the decrypt stream, or the
+ * network error from the download) is captured here and rethrown instead.
+ *
+ * @internal
+ */
+export async function streamToBlob(stream: ReadableStream<Uint8Array>): Promise<Blob> {
+  const reader = stream.getReader();
+  let failed = false;
+  let failure: unknown;
+
+  const observed = new ReadableStream<Uint8Array>({
+    async pull(controller): Promise<void> {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+        } else {
+          controller.enqueue(value);
+        }
+      } catch (error) {
+        failed = true;
+        failure = error;
+        controller.error(error);
+      }
+    },
+    cancel(reason): Promise<void> {
+      return reader.cancel(reason);
+    },
+  });
+
+  try {
+    return await new Response(observed).blob();
+  } catch (error) {
+    throw failed ? failure : error;
+  }
 }
