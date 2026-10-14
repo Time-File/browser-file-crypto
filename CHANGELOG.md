@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-15
+
+### Fixed
+
+- **Long downloads could lose their file while it was being saved.** The temporary-file sweep (run before each disk-backed download and by `cleanupDownloadCache`) judged a file's age by its creation time, so a download that took longer than 30 minutes was removed by the next sweep right after it was handed to the browser — for example when another download started or another tab called `cleanupDownloadCache` — and the save failed with `NotFoundError`. Reproduced in WebKit 26 and Chromium 143.
+  - Each temporary file is now protected by a Web Lock held by the page that created it, from creation until its own removal; sweeps skip locked files. When that page closes, the lock is released and its files become eligible.
+  - A file's age is now measured from its last write (`File#lastModified`, updated when the download completes), so files are protected for 30 minutes after saving even where Web Locks are unavailable.
+- `cleanupDownloadCache(maxAgeMs)` now means: remove files last written at least `maxAgeMs` ago that no open page is using.
+
 ## [1.3.0] - 2026-10-14
 
 ### Added

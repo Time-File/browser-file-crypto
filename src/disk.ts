@@ -16,8 +16,12 @@
  * - Anything else (no OPFS, private browsing, too little quota, a CSP that
  *   blocks blob: workers) falls back to an in-memory Blob.
  *
- * Temporary files are removed 30 minutes after the save, and stale ones are
- * cleared before each disk-backed download and by {@link cleanupDownloadCache}.
+ * Temporary files are removed 30 minutes after the save. Files left behind by
+ * closed tabs are cleared before each disk-backed download and by
+ * {@link cleanupDownloadCache}. A file is never cleared while the page that
+ * created it holds its Web Lock (from creation until its own removal), and
+ * its age is measured from its last write, not its creation, so a download
+ * that took longer than 30 minutes is not removed while it is being saved.
  *
  * @module disk
  * @since 1.3.0
@@ -28,6 +32,12 @@ export const DOWNLOAD_CACHE_DIRECTORY = 'browser-file-crypto-downloads';
 
 /** Time a saved file stays in OPFS so the browser can finish reading it. */
 const KEEP_AFTER_SAVE_MS = 30 * 60 * 1000;
+
+/**
+ * Prefix of the Web Lock held for each temporary file while its page can
+ * still use it. Other pages skip locked files when clearing the cache.
+ */
+const LOCK_PREFIX = `${DOWNLOAD_CACHE_DIRECTORY}:`;
 
 /** Bytes buffered before a worker write, to limit postMessage round trips. */
 const WORKER_BATCH_BYTES = 4 * 1024 * 1024;
@@ -60,14 +70,18 @@ export interface DiskTarget {
 }
 
 /**
- * Removes temporary download files older than `maxAgeMs`.
+ * Removes temporary download files left behind by closed tabs.
  *
  * @description
- * Disk-backed downloads keep their temporary OPFS file for 30 minutes so the
- * browser can finish saving it. Call this on page load to reclaim space left
- * behind by tabs that were closed in the meantime. Never throws.
+ * Disk-backed downloads keep their temporary OPFS file for 30 minutes after
+ * saving so the browser can finish reading it. Call this on page load to
+ * reclaim space left behind by tabs that were closed in the meantime.
  *
- * @param maxAgeMs - Minimum age of files to remove (default: 30 minutes)
+ * A file is removed only when it was last written at least `maxAgeMs` ago and
+ * no open page is still using it (checked with Web Locks where available).
+ * Never throws.
+ *
+ * @param maxAgeMs - Minimum time since a file was last written (default: 30 minutes)
  *
  * @example
  * ```typescript
@@ -105,14 +119,23 @@ export async function openDiskTarget(expectedBytes?: number): Promise<DiskTarget
   }
 
   const name = `${Date.now()}-${randomSuffix()}`;
+  // Taken before the file exists so no other page can see it unlocked.
+  const releaseLock = await holdLock(name);
   let fileHandle: FileSystemFileHandle;
   try {
     fileHandle = await directory.getFileHandle(name, { create: true });
   } catch {
+    releaseLock();
     return null;
   }
 
-  const remove = (): Promise<void> => removeWithRetry(directory, name);
+  const remove = async (): Promise<void> => {
+    try {
+      await removeWithRetry(directory, name);
+    } finally {
+      releaseLock();
+    }
+  };
 
   const target =
     (await openWritableTarget(fileHandle)) ?? (await openWorkerTarget(name));
@@ -208,23 +231,119 @@ async function hasRoomFor(expectedBytes: number | undefined): Promise<boolean> {
   }
 }
 
+/**
+ * Removes temporary files that no open page is using and that were last
+ * written at least `maxAgeMs` ago.
+ *
+ * The age is taken from the file's last write (`File#lastModified`, updated
+ * when a download completes), not from the creation time in its name: a
+ * download that took longer than `maxAgeMs` must not be removed while the
+ * browser is still saving it.
+ */
 async function removeStaleEntries(
   directory: FileSystemDirectoryHandle,
   maxAgeMs: number
 ): Promise<void> {
-  const now = Date.now();
-  const names: string[] = [];
   const iterable = directory as unknown as { keys?: () => AsyncIterable<string> };
   if (typeof iterable.keys !== 'function') return;
+  const candidates: string[] = [];
   for await (const name of iterable.keys()) {
     const createdAt = parseInt(name.split('-')[0] ?? '', 10);
-    if (Number.isFinite(createdAt) && now - createdAt >= maxAgeMs) {
-      names.push(name);
+    // The last write is never earlier than the creation, so recent files are skipped cheaply.
+    if (Number.isFinite(createdAt) && Date.now() - createdAt >= maxAgeMs) {
+      candidates.push(name);
     }
   }
   await Promise.all(
-    names.map((name) => directory.removeEntry(name).catch(() => undefined))
+    candidates.map((name) =>
+      ifUnlocked(name, async () => {
+        const createdAt = parseInt(name.split('-')[0] ?? '', 10);
+        const file = await (await directory.getFileHandle(name)).getFile();
+        const lastWrite = Math.max(createdAt, file.lastModified || 0);
+        if (Date.now() - lastWrite >= maxAgeMs) {
+          await directory.removeEntry(name);
+        }
+      }).catch(() => undefined)
+    )
   );
+}
+
+interface LockManagerLike {
+  request(
+    name: string,
+    options: { ifAvailable: boolean },
+    callback: (lock: unknown) => unknown
+  ): Promise<unknown>;
+}
+
+function lockManager(): LockManagerLike | null {
+  try {
+    const locks =
+      typeof navigator === 'undefined'
+        ? undefined
+        : (navigator as unknown as { locks?: LockManagerLike }).locks;
+    return typeof locks?.request === 'function' ? locks : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Holds the Web Lock of a temporary file until the returned function is
+ * called (or the page goes away). Returns a no-op when Web Locks are
+ * unavailable, in which case other pages rely on the file's age alone.
+ */
+async function holdLock(name: string): Promise<() => void> {
+  const noop = (): void => undefined;
+  return new Promise((resolve) => {
+    try {
+      const locks = lockManager();
+      if (!locks) {
+        resolve(noop);
+        return;
+      }
+      let release: () => void = noop;
+      locks
+        .request(LOCK_PREFIX + name, { ifAvailable: true }, (lock) => {
+          if (!lock) {
+            resolve(noop);
+            return undefined;
+          }
+          return new Promise<void>((done) => {
+            release = done;
+            resolve(() => release());
+          });
+        })
+        .catch(() => resolve(noop));
+    } catch {
+      // Some sandboxed contexts throw instead of rejecting; go on without a lock.
+      resolve(noop);
+    }
+  });
+}
+
+/**
+ * Runs `action` only if no page holds the file's Web Lock, keeping the lock
+ * for the duration so the check and the action cannot interleave with a
+ * page that is about to use it.
+ */
+async function ifUnlocked(name: string, action: () => Promise<void>): Promise<void> {
+  const locks = lockManager();
+  if (!locks) {
+    await action();
+    return;
+  }
+  let granted = false;
+  try {
+    await locks.request(LOCK_PREFIX + name, { ifAvailable: true }, async (lock) => {
+      granted = true;
+      if (lock) await action();
+    });
+  } catch (error) {
+    if (granted) throw error;
+    // Web Locks refused the request: fall back to the file's age alone.
+    await action();
+  }
 }
 
 /**
