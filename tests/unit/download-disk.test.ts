@@ -520,6 +520,24 @@ describe('disk-backed downloads', () => {
       expect(locks.held.size).toBe(0);
     });
 
+    it('removes a failed download without Web Locks', async () => {
+      vi.stubGlobal('navigator', {
+        storage: { getDirectory, estimate: () => Promise.resolve(estimate) },
+      });
+      globalThis.fetch = vi.fn(
+        respondWith(await streamEncrypt(randomBytes(20_000)), {
+          afterBytes: 6000,
+          error: new TypeError('Load failed'),
+        })
+      ) as unknown as typeof fetch;
+
+      await expect(
+        downloadAndDecrypt('https://example.com/large.enc', { password, fileName: 'large.bin' })
+      ).rejects.toMatchObject({ code: 'DOWNLOAD_FAILED' });
+
+      expect(cache()?.files.size).toBe(0);
+    });
+
     it.each([
       ['rejected', () => Promise.reject(new DOMException('Denied', 'SecurityError'))],
       [
