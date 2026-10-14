@@ -14,11 +14,13 @@ import type {
   DecryptOptions,
   DownloadDecryptOptions,
   DownloadDecryptStreamOptions,
+  DownloadStorage,
   ProgressCallback,
   ProgressPhase,
   StreamProgress,
 } from './types';
 import { decryptFile } from './decrypt';
+import { collectToDisk, isQuotaError } from './disk';
 import { createDecryptStream, decryptFileStream, streamToBlob } from './stream';
 
 /**
@@ -30,8 +32,10 @@ import { createDecryptStream, decryptFileStream, streamToBlob } from './stream';
  *
  * Streaming-encrypted files (created by `encryptFileStream` or
  * `encryptFileAuto`) are decrypted while they download, so the ciphertext is
- * never buffered in memory. Single-shot encrypted files must be decrypted as
- * a whole and are buffered once.
+ * never buffered in memory, and the plaintext is assembled in a temporary
+ * Origin Private File System file when available (see `storage`), so large
+ * files do not have to fit in memory either. Single-shot encrypted files must
+ * be decrypted as a whole and are buffered once.
  *
  * Phases:
  * 1. `downloading`: Fetching file from URL (0-50%; 0-95% for
@@ -69,61 +73,9 @@ export async function downloadAndDecrypt(
   url: string,
   options: DownloadDecryptOptions
 ): Promise<void> {
-  const { fileName, onProgress, ...decryptOptions } = options;
-  const report = createReporter(onProgress);
-
-  try {
-    // Phase 1: Download file
-    report('downloading', 0);
-
-    const response = await fetchEncrypted(url);
-    const totalBytes = readContentLength(response);
-    let decrypted: Blob;
-
-    if (response.body) {
-      let downloadShare = 50;
-      const source = await openBody(response.body, (receivedBytes) => {
-        if (!totalBytes) return;
-        const ratio = Math.min(receivedBytes / totalBytes, 1);
-        report('downloading', Math.round(ratio * downloadShare));
-      });
-
-      if (source.streaming) {
-        // Bytes are counted as they are replayed, so this applies from the first chunk.
-        downloadShare = 95;
-        // Decrypt while downloading: the ciphertext is never held in memory.
-        decrypted = await streamToBlob(
-          source.stream.pipeThrough(
-            createDecryptStream({
-              ...decryptOptions,
-              onProgress: (progress: StreamProgress) => {
-                if (progress.phase === 'deriving_key') {
-                  report('deriving_key', report.last());
-                }
-              },
-            })
-          )
-        );
-      } else {
-        if (!totalBytes) report('downloading', 25);
-        const encryptedData = await readAll(source.stream, totalBytes);
-        report('downloading', 50);
-        decrypted = await decryptWithProgress(encryptedData, decryptOptions, report);
-      }
-    } else {
-      // Fallback: no body stream, no progress tracking
-      report('downloading', 25);
-      const encryptedData = await response.arrayBuffer();
-      report('downloading', 50);
-      decrypted = await decryptWithProgress(encryptedData, decryptOptions, report);
-    }
-
-    // Phase 4: Save file
-    saveFile(decrypted, fileName);
-    report('complete', 100);
-  } catch (error) {
-    throw toCryptoError(error, 'DOWNLOAD_FAILED');
-  }
+  await withMemoryRetry(options.storage, (storage) =>
+    downloadAndDecryptOnce(url, options, storage)
+  );
 }
 
 /**
@@ -167,52 +119,174 @@ export async function downloadAndDecryptStream(
   url: string,
   options: DownloadDecryptStreamOptions
 ): Promise<void> {
+  await withMemoryRetry(options.storage, (storage) =>
+    downloadAndDecryptStreamOnce(url, options, storage)
+  );
+}
+
+/**
+ * Runs a download, retrying once in memory when disk-backed storage runs out
+ * of quota mid-download (e.g. a small quota in an in-app browser). Wraps
+ * unexpected failures in DOWNLOAD_FAILED, keeping the original as `cause`.
+ *
+ * @internal
+ */
+async function withMemoryRetry(
+  requested: DownloadStorage | undefined,
+  run: (storage: DownloadStorage) => Promise<void>
+): Promise<void> {
+  const storage = requested ?? 'auto';
+  try {
+    await run(storage);
+  } catch (error) {
+    if (storage === 'memory' || !isQuotaError(error)) {
+      throw toCryptoError(error, 'DOWNLOAD_FAILED');
+    }
+    try {
+      await run('memory');
+    } catch (retryError) {
+      throw toCryptoError(retryError, 'DOWNLOAD_FAILED');
+    }
+  }
+}
+
+/** @internal */
+async function downloadAndDecryptOnce(
+  url: string,
+  options: DownloadDecryptOptions,
+  storage: DownloadStorage
+): Promise<void> {
+  const { fileName, onProgress, password, keyData } = options;
+  const decryptOptions = { password, keyData };
+  const report = createReporter(onProgress);
+
+  // Phase 1: Download file
+  report('downloading', 0);
+
+  const response = await fetchEncrypted(url);
+  const totalBytes = readContentLength(response);
+  let decrypted: Blob;
+
+  if (response.body) {
+    let downloadShare = 50;
+    const source = await openBody(response.body, (receivedBytes) => {
+      if (!totalBytes) return;
+      const ratio = Math.min(receivedBytes / totalBytes, 1);
+      report('downloading', Math.round(ratio * downloadShare));
+    });
+
+    if (source.streaming) {
+      // Bytes are counted as they are replayed, so this applies from the first chunk.
+      downloadShare = 95;
+      // Decrypt while downloading: the ciphertext is never held in memory,
+      // and the plaintext goes to disk when the browser allows it.
+      decrypted = await collectDecrypted(
+        source.stream.pipeThrough(
+          createDecryptStream({
+            ...decryptOptions,
+            onProgress: (progress: StreamProgress) => {
+              if (progress.phase === 'deriving_key') {
+                report('deriving_key', report.last());
+              }
+            },
+          })
+        ),
+        totalBytes,
+        storage
+      );
+    } else {
+      if (!totalBytes) report('downloading', 25);
+      const encryptedData = await readAll(source.stream, totalBytes);
+      report('downloading', 50);
+      decrypted = await decryptWithProgress(encryptedData, decryptOptions, report);
+    }
+  } else {
+    // Fallback: no body stream, no progress tracking
+    report('downloading', 25);
+    const encryptedData = await response.arrayBuffer();
+    report('downloading', 50);
+    decrypted = await decryptWithProgress(encryptedData, decryptOptions, report);
+  }
+
+  // Phase 4: Save file
+  saveFile(decrypted, fileName);
+  report('complete', 100);
+}
+
+/** @internal */
+async function downloadAndDecryptStreamOnce(
+  url: string,
+  options: DownloadDecryptStreamOptions,
+  storage: DownloadStorage
+): Promise<void> {
   const { fileName, password, keyData, onProgress } = options;
-  let processedBytes = 0;
-  let processedChunks = 0;
-  let totalBytes: number | undefined;
+  const state: { processedBytes: number; processedChunks: number; totalBytes?: number } = {
+    processedBytes: 0,
+    processedChunks: 0,
+  };
 
   const report = createReporter((progress) => {
-    onProgress?.({ ...progress, processedBytes, processedChunks, totalBytes });
+    onProgress?.({ ...progress, ...state });
   });
 
   const decryptOptions = {
     password,
     keyData,
     onProgress: (progress: StreamProgress): void => {
-      processedBytes = progress.processedBytes;
-      processedChunks = progress.processedChunks;
+      state.processedBytes = progress.processedBytes;
+      state.processedChunks = progress.processedChunks;
       if (progress.phase === 'deriving_key') {
         report('deriving_key', report.last());
       }
     },
   };
 
-  try {
-    report('downloading', 0);
+  report('downloading', 0);
 
-    const response = await fetchEncrypted(url);
-    totalBytes = readContentLength(response);
-    let decrypted: Blob;
+  const response = await fetchEncrypted(url);
+  const totalBytes = readContentLength(response);
+  state.totalBytes = totalBytes;
+  let decrypted: Blob;
 
-    if (response.body) {
-      const source = await openBody(response.body, (receivedBytes) => {
-        if (!totalBytes) return;
-        report('downloading', Math.round(Math.min(receivedBytes / totalBytes, 1) * 95));
-      });
-      if (!totalBytes) report('downloading', 25);
-      decrypted = await streamToBlob(source.stream.pipeThrough(createDecryptStream(decryptOptions)));
-    } else {
-      report('downloading', 25);
-      const encryptedBlob = await response.blob();
-      decrypted = await streamToBlob(decryptFileStream(encryptedBlob, decryptOptions));
-    }
-
-    saveFile(decrypted, fileName);
-    report('complete', 100);
-  } catch (error) {
-    throw toCryptoError(error, 'DOWNLOAD_FAILED');
+  if (response.body) {
+    const source = await openBody(response.body, (receivedBytes) => {
+      if (!totalBytes) return;
+      report('downloading', Math.round(Math.min(receivedBytes / totalBytes, 1) * 95));
+    });
+    if (!totalBytes) report('downloading', 25);
+    decrypted = await collectDecrypted(
+      source.stream.pipeThrough(createDecryptStream(decryptOptions)),
+      totalBytes,
+      storage
+    );
+  } else {
+    report('downloading', 25);
+    const encryptedBlob = await response.blob();
+    decrypted = await collectDecrypted(
+      decryptFileStream(encryptedBlob, decryptOptions),
+      totalBytes ?? encryptedBlob.size,
+      storage
+    );
   }
+
+  saveFile(decrypted, fileName);
+  report('complete', 100);
+}
+
+/**
+ * Assembles a decrypted stream on disk (OPFS) when allowed and available,
+ * otherwise in memory.
+ *
+ * @internal
+ */
+function collectDecrypted(
+  stream: ReadableStream<Uint8Array>,
+  expectedBytes: number | undefined,
+  storage: DownloadStorage
+): Promise<Blob> {
+  return storage === 'memory'
+    ? streamToBlob(stream)
+    : collectToDisk(stream, expectedBytes, streamToBlob);
 }
 
 /**

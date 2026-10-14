@@ -125,7 +125,24 @@ export interface DecryptOptions {
 export interface DownloadDecryptOptions extends DecryptOptions {
   /** File name to use when saving the decrypted file */
   fileName: string;
+
+  /**
+   * Where streaming-encrypted files are assembled before saving.
+   * - `'auto'` (default): a temporary file in the Origin Private File System
+   *   when available, otherwise memory
+   * - `'memory'`: always an in-memory Blob
+   *
+   * @since 1.3.0
+   */
+  storage?: DownloadStorage;
 }
+
+/**
+ * Where a decrypted download is assembled before it is saved.
+ *
+ * @since 1.3.0
+ */
+export type DownloadStorage = 'auto' | 'memory';
 
 /**
  * Key file structure for keyfile-based encryption.
@@ -269,6 +286,14 @@ export interface StreamDecryptOptions {
 export interface DownloadDecryptStreamOptions extends StreamDecryptOptions {
   /** File name to use when saving the decrypted file */
   fileName: string;
+
+  /**
+   * Where the decrypted file is assembled before saving (default `'auto'`).
+   *
+   * @see {@link DownloadDecryptOptions.storage}
+   * @since 1.3.0
+   */
+  storage?: DownloadStorage;
 }
 
 /**

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-14
+
+### Added
+
+- **Disk-backed downloads** - `downloadAndDecrypt` and `downloadAndDecryptStream` assemble streaming-encrypted files in a temporary Origin Private File System file instead of an in-memory Blob, and save that disk-backed `File`. WebKit keeps `Response#blob()` results in memory: decrypting a 1GB file at 80MB/s peaked at ~4.9GB renderer memory in-memory vs ~350MB disk-backed (Playwright WebKit 26). Writes use `createWritable()` where available and a `createSyncAccessHandle()` worker on Safari 15.2-18.
+- `storage: 'auto' | 'memory'` option (default `'auto'`). `'auto'` falls back to memory when OPFS is unavailable, the quota estimate is too small, or a worker cannot be started; a `QuotaExceededError` mid-download restarts the download once in memory.
+- `cleanupDownloadCache(maxAgeMs?)` removes temporary download files left by closed tabs. Temporary files are otherwise removed 30 minutes after saving, and stale ones before each disk-backed download.
+- `DownloadStorage` type.
+
 ## [1.2.0] - 2026-10-14
 
 ### Changed
