@@ -39,15 +39,17 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Measures what consumers ship: the ES build minified and gzipped.
+      # The limit matches the "< 7KB gzipped" claim in the README.
       - name: Check bundle size
         run: |
-          SIZE=$(stat -c%s dist/index.mjs 2>/dev/null || stat -f%z dist/index.mjs)
-          echo "Bundle size: $SIZE bytes"
-          if [ $SIZE -gt 10240 ]; then
-            echo "::warning::Bundle size exceeds 10KB: $SIZE bytes"
+          SIZE=$(npx esbuild dist/index.mjs --minify --format=esm --log-level=error | gzip -c | wc -c | tr -d ' ')
+          echo "Bundle size (minified + gzip): $SIZE bytes"
+          if [ "$SIZE" -gt 6656 ]; then
+            echo "::warning::Bundle size exceeds 6.5KB (minified + gzip): $SIZE bytes"
           fi
-          if [ $SIZE -gt 20480 ]; then
-            echo "::error::Bundle size exceeds 20KB limit!"
+          if [ "$SIZE" -gt 7168 ]; then
+            echo "::error::Bundle size exceeds the 7KB (minified + gzip) limit!"
             exit 1
           fi
           echo "✅ Bundle size is within limit"
