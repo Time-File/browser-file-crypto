@@ -16,11 +16,15 @@ class FakeFileHandle {
   committed: Uint8Array[] = [];
   writableOpen = false;
   failWritesAfterBytes: number | undefined;
+  /** Last write time, like `File#lastModified`. Seeded from the name's timestamp. */
+  modifiedAt: number;
 
   constructor(
     readonly name: string,
     readonly supportsWritable: boolean
-  ) {}
+  ) {
+    this.modifiedAt = Number.parseInt(name, 10) || Date.now();
+  }
 
   get createWritable(): (() => Promise<WritableStream<Uint8Array>>) | undefined {
     if (!this.supportsWritable) return undefined;
@@ -38,6 +42,7 @@ class FakeFileHandle {
         },
         close: () => {
           this.committed = staged;
+          this.modifiedAt = Date.now();
           this.writableOpen = false;
         },
         abort: () => {
@@ -48,7 +53,37 @@ class FakeFileHandle {
   }
 
   async getFile(): Promise<File> {
-    return new File(this.committed, this.name);
+    return new File(this.committed, this.name, { lastModified: this.modifiedAt });
+  }
+}
+
+/** Web Locks with exclusive locks and `ifAvailable`, shared by every "page". */
+class FakeLocks {
+  readonly held = new Set<string>();
+
+  async request(
+    name: string,
+    _options: { ifAvailable: boolean },
+    callback: (lock: { name: string } | null) => unknown
+  ): Promise<unknown> {
+    if (this.held.has(name)) return callback(null);
+    this.held.add(name);
+    try {
+      return await callback({ name });
+    } finally {
+      this.held.delete(name);
+    }
+  }
+
+  /** Holds a lock the way another page would, until the returned function is called. */
+  holdFromAnotherPage(name: string): () => void {
+    let release!: () => void;
+    void this.request(
+      name,
+      { ifAvailable: true },
+      () => new Promise<void>((done) => (release = done))
+    );
+    return () => release();
   }
 }
 
@@ -141,6 +176,7 @@ function respondWith(bytes: Uint8Array, failure?: { afterBytes: number; error: u
 
 describe('disk-backed downloads', () => {
   let root: FakeDirectory;
+  let locks: FakeLocks;
   let saved: Blob[];
   let estimate: { quota?: number; usage?: number };
   let getDirectory: ReturnType<typeof vi.fn>;
@@ -152,11 +188,13 @@ describe('disk-backed downloads', () => {
 
   beforeEach(() => {
     root = new FakeDirectory();
+    locks = new FakeLocks();
     saved = [];
     estimate = { quota: 10 * 1024 * 1024 * 1024, usage: 0 };
     getDirectory = vi.fn(() => Promise.resolve(root));
     vi.stubGlobal('navigator', {
       storage: { getDirectory, estimate: () => Promise.resolve(estimate) },
+      locks,
     });
 
     originalDocument = globalThis.document;
@@ -265,7 +303,9 @@ describe('disk-backed downloads', () => {
   it('falls back to memory when OPFS is unavailable (e.g. private browsing)', async () => {
     getDirectory.mockRejectedValue(new DOMException('Denied', 'SecurityError'));
     const plaintext = randomBytes(5000);
-    globalThis.fetch = vi.fn(respondWith(await streamEncrypt(plaintext))) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(
+      respondWith(await streamEncrypt(plaintext))
+    ) as unknown as typeof fetch;
 
     await downloadAndDecrypt('https://example.com/large.enc', { password, fileName: 'large.bin' });
 
@@ -336,7 +376,196 @@ describe('disk-backed downloads', () => {
     expect(names).toHaveLength(2);
   });
 
+  describe('downloads that take longer than the cache lifetime', () => {
+    let now: number;
+
+    /** A download whose network transfer takes `minutes` of (fake) time. */
+    async function slowDownload(minutes: number): Promise<void> {
+      const plaintext = randomBytes(5000);
+      const encrypted = await streamEncrypt(plaintext);
+      globalThis.fetch = vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers({ 'content-length': String(encrypted.length) }),
+          body: (() => {
+            let offset = 0;
+            return new ReadableStream<Uint8Array>({
+              pull(controller): void {
+                if (offset >= encrypted.length) {
+                  // The transfer ends `minutes` after it started (and after the file was created).
+                  now += minutes * 60 * 1000;
+                  controller.close();
+                  return;
+                }
+                const end = Math.min(offset + 700, encrypted.length);
+                controller.enqueue(encrypted.slice(offset, end));
+                offset = end;
+              },
+            });
+          })(),
+        })
+      ) as unknown as typeof fetch;
+      await downloadAndDecrypt('https://example.com/large.enc', {
+        password,
+        fileName: 'large.bin',
+      });
+      expect(new Uint8Array(await saved.at(-1)!.arrayBuffer())).toEqual(plaintext);
+    }
+
+    beforeEach(() => {
+      now = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+    });
+
+    it.each([
+      ['with Web Locks', true],
+      ['without Web Locks', false],
+    ])('keeps a just-saved file from another page cleanup (%s)', async (_label, withLocks) => {
+      if (!withLocks) {
+        vi.stubGlobal('navigator', {
+          storage: { getDirectory, estimate: () => Promise.resolve(estimate) },
+        });
+      }
+      await slowDownload(31);
+      const file = saved[0]!;
+
+      await cleanupDownloadCache();
+
+      expect(cache()?.files.size).toBe(1);
+      expect((await file.arrayBuffer()).byteLength).toBe(5000);
+    });
+
+    it('keeps a just-saved file when the next download starts', async () => {
+      await slowDownload(31);
+      await slowDownload(1);
+
+      expect(cache()?.files.size).toBe(2);
+    });
+
+    it('lets the page that created a file keep it while the lock is held', async () => {
+      await slowDownload(1);
+      now += 2 * THIRTY_MINUTES; // setTimeout not faked: only another page's sweep could remove it
+
+      await cleanupDownloadCache();
+
+      expect(cache()?.files.size).toBe(1);
+    });
+
+    it('removes files of closed pages once their last write is old enough', async () => {
+      const directory = await root.getDirectoryHandle(DOWNLOAD_CACHE_DIRECTORY, { create: true });
+      const orphan = await directory.getFileHandle(`${now - 3 * THIRTY_MINUTES}-orphan`, {
+        create: true,
+      });
+      orphan.modifiedAt = now - THIRTY_MINUTES - 1000;
+      const recentlySaved = await directory.getFileHandle(`${now - 3 * THIRTY_MINUTES}-recent`, {
+        create: true,
+      });
+      recentlySaved.modifiedAt = now - 1000;
+
+      await cleanupDownloadCache();
+
+      expect([...directory.files.keys()].map((name) => name.split('-')[1])).toEqual(['recent']);
+    });
+
+    it('skips files another page still holds, and removes them once released', async () => {
+      const directory = await root.getDirectoryHandle(DOWNLOAD_CACHE_DIRECTORY, { create: true });
+      const name = `${now - 3 * THIRTY_MINUTES}-held`;
+      await directory.getFileHandle(name, { create: true });
+      const release = locks.holdFromAnotherPage(`${DOWNLOAD_CACHE_DIRECTORY}:${name}`);
+
+      await cleanupDownloadCache();
+      expect(directory.files.has(name)).toBe(true);
+
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await cleanupDownloadCache();
+      expect(directory.files.has(name)).toBe(false);
+    });
+  });
+
+  describe('temporary file locks', () => {
+    it('holds a lock from creation until the file is removed', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout'] });
+      globalThis.fetch = vi.fn(
+        respondWith(await streamEncrypt(randomBytes(3000)))
+      ) as unknown as typeof fetch;
+
+      await downloadAndDecrypt('https://example.com/large.enc', {
+        password,
+        fileName: 'large.bin',
+      });
+      const [name] = [...cache()!.files.keys()];
+      expect([...locks.held]).toEqual([`${DOWNLOAD_CACHE_DIRECTORY}:${name}`]);
+
+      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES);
+      expect(cache()?.files.size).toBe(0);
+      expect(locks.held.size).toBe(0);
+    });
+
+    it('releases the lock when a failed download is discarded', async () => {
+      globalThis.fetch = vi.fn(
+        respondWith(await streamEncrypt(randomBytes(20_000)), {
+          afterBytes: 6000,
+          error: new TypeError('Load failed'),
+        })
+      ) as unknown as typeof fetch;
+
+      await expect(
+        downloadAndDecrypt('https://example.com/large.enc', { password, fileName: 'large.bin' })
+      ).rejects.toMatchObject({ code: 'DOWNLOAD_FAILED' });
+
+      expect(cache()?.files.size).toBe(0);
+      expect(locks.held.size).toBe(0);
+    });
+
+    it.each([
+      ['rejected', () => Promise.reject(new DOMException('Denied', 'SecurityError'))],
+      [
+        'thrown',
+        () => {
+          throw new DOMException('Denied', 'SecurityError');
+        },
+      ],
+    ])('still saves to disk when the lock request is %s', async (_label, request) => {
+      vi.stubGlobal('navigator', {
+        storage: { getDirectory, estimate: () => Promise.resolve(estimate) },
+        locks: { request },
+      });
+      const plaintext = randomBytes(5000);
+      globalThis.fetch = vi.fn(
+        respondWith(await streamEncrypt(plaintext))
+      ) as unknown as typeof fetch;
+
+      await downloadAndDecrypt('https://example.com/large.enc', {
+        password,
+        fileName: 'large.bin',
+      });
+
+      expect(saved[0]).toBeInstanceOf(File);
+      expect(new Uint8Array(await saved[0]!.arrayBuffer())).toEqual(plaintext);
+    });
+  });
+
   describe('cleanupDownloadCache', () => {
+    it('falls back to the last write time when Web Locks refuse the request', async () => {
+      vi.stubGlobal('navigator', {
+        storage: { getDirectory, estimate: () => Promise.resolve(estimate) },
+        locks: { request: () => Promise.reject(new DOMException('Denied', 'SecurityError')) },
+      });
+      const directory = await root.getDirectoryHandle(DOWNLOAD_CACHE_DIRECTORY, { create: true });
+      await directory.getFileHandle(`${Date.now() - 2 * THIRTY_MINUTES}-orphan`, { create: true });
+      const saved = await directory.getFileHandle(`${Date.now() - 2 * THIRTY_MINUTES}-saved`, {
+        create: true,
+      });
+      saved.modifiedAt = Date.now();
+
+      await cleanupDownloadCache();
+
+      expect([...directory.files.keys()].map((name) => name.split('-')[1])).toEqual(['saved']);
+    });
+
     it('removes files older than the given age', async () => {
       const directory = await root.getDirectoryHandle(DOWNLOAD_CACHE_DIRECTORY, { create: true });
       await directory.getFileHandle(`${Date.now() - 5000}-old`, { create: true });

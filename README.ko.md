@@ -274,7 +274,8 @@ import { cleanupDownloadCache } from '@time-file/browser-file-crypto';
 await downloadAndDecrypt(url, { password, fileName, storage: 'memory' });
 
 // 임시 파일은 저장 30분 뒤 삭제됩니다. 그 사이 닫힌 탭이 남긴 파일은
-// 페이지 로드 시 정리하세요
+// 페이지 로드 시 정리하세요. 열려 있는 페이지가 쓰는 파일은 지우지 않고(Web Locks),
+// 경과 시간은 마지막 쓰기 시점부터 세므로 오래 걸린 다운로드도 저장 중에 지워지지 않습니다.
 void cleanupDownloadCache();
 ```
 

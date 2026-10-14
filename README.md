@@ -275,7 +275,9 @@ import { cleanupDownloadCache } from '@time-file/browser-file-crypto';
 await downloadAndDecrypt(url, { password, fileName, storage: 'memory' });
 
 // Temporary files are removed 30 minutes after saving; call on page load to
-// reclaim space left by tabs closed in the meantime
+// reclaim space left by tabs closed in the meantime. Files that an open page
+// is still using are never removed (Web Locks), and age counts from the last
+// write, so long downloads are safe while they are being saved.
 void cleanupDownloadCache();
 ```
 
