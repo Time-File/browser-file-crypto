@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `cleanupDownloadCache(maxAgeMs?)` removes temporary download files left by closed tabs. Temporary files are otherwise removed 30 minutes after saving, and stale ones before each disk-backed download.
 - `DownloadStorage` type.
 
+### Changed
+
+- Bundle size is now ~6.6KB minified + gzipped (was ~4.9KB); the README claim is updated to < 7KB. Apps that do not use the download functions tree-shake the disk code away (`sideEffects: false`). CI now checks the minified + gzipped ES build against 7KB instead of the unminified file against 20KB.
+
 ## [1.2.0] - 2026-10-14
 
 ### Changed

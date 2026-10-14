@@ -47,7 +47,7 @@
 - **Streaming Support** - Memory-efficient large file handling (v1.1.0+)
 - **Progress Callbacks** - Track encryption/decryption progress
 - **TypeScript** - Full type definitions
-- **Tiny** - < 5KB gzipped
+- **Tiny** - < 7KB gzipped
 
 ## Why?
 
@@ -103,7 +103,7 @@ const decrypted = await decryptFile(encrypted, { password: 'secret' });
 | Feature | crypto-js | @aws-crypto | Web Crypto (direct) | **browser-file-crypto** |
 |---------|-----------|-------------|---------------------|------------------------|
 | Maintained | ❌ Deprecated | ✅ | - | ✅ |
-| Bundle size | ~50KB | ~200KB+ | 0 | **< 5KB** |
+| Bundle size | ~50KB | ~200KB+ | 0 | **< 7KB** |
 | Dependencies | Many | Many | None | **None** |
 | File-focused API | ❌ | ⚠️ | ❌ | **✅** |
 | Progress callbacks | ❌ | ❌ | ❌ | **✅** |
