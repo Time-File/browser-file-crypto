@@ -73,6 +73,7 @@ export {
 // =============================================================================
 
 export { downloadAndDecrypt, downloadAndDecryptStream } from './download';
+export { cleanupDownloadCache } from './disk';
 
 // =============================================================================
 // Types
@@ -95,6 +96,8 @@ export type {
   StreamProgressCallback,
   // v1.1.1 additions
   DownloadDecryptStreamOptions,
+  // Disk-backed downloads (v1.3.0)
+  DownloadStorage,
   AutoEncryptOptions,
 } from './types';
 

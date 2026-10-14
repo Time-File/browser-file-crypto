@@ -265,6 +265,19 @@ await downloadAndDecryptStream('https://example.com/large-file.enc', {
 });
 ```
 
+스트리밍 방식으로 암호화된 파일은 다운로드하면서 바로 복호화하고(v1.2.0+), 복호화된 내용은 메모리 대신 [Origin Private File System](https://developer.mozilla.org/docs/Web/API/File_System_API/Origin_private_file_system) 임시 파일에 모은 뒤 저장합니다(v1.3.0+). Safari와 모든 iOS 브라우저에서는 1GB 파일을 메모리 Blob으로 만들 때 수 GB의 메모리를 쓰기 때문에 차이가 큽니다. OPFS를 쓸 수 없거나(시크릿 모드, 용량 부족, blob: 워커를 막는 CSP) 다운로드 도중 용량이 부족해지면 자동으로 메모리 방식으로 전환합니다.
+
+```typescript
+import { cleanupDownloadCache } from '@time-file/browser-file-crypto';
+
+// 디스크 임시 파일을 쓰지 않으려면
+await downloadAndDecrypt(url, { password, fileName, storage: 'memory' });
+
+// 임시 파일은 저장 30분 뒤 삭제됩니다. 그 사이 닫힌 탭이 남긴 파일은
+// 페이지 로드 시 정리하세요
+void cleanupDownloadCache();
+```
+
 ### 에러 처리
 
 ```typescript
@@ -275,6 +288,8 @@ try {
 } catch (error) {
   if (isCryptoError(error)) {
     // error.code: 'INVALID_PASSWORD' | 'INVALID_KEYFILE' | 'INVALID_ENCRYPTED_DATA'
+    // error.cause (v1.2.0+): DOWNLOAD_FAILED, DECRYPTION_FAILED, ENCRYPTION_FAILED의
+    // 원인이 된 네트워크·스트림·메모리 오류
   }
 }
 ```

@@ -266,6 +266,19 @@ await downloadAndDecryptStream('https://example.com/large-file.enc', {
 });
 ```
 
+Streaming-encrypted files are decrypted while they download (v1.2.0+), and the plaintext is assembled in a temporary [Origin Private File System](https://developer.mozilla.org/docs/Web/API/File_System_API/Origin_private_file_system) file instead of memory when available (v1.3.0+). This matters most in Safari and every iOS browser, where an in-memory Blob of a 1GB file can take several GB of memory. If OPFS is unavailable (private browsing, too little quota, CSP blocking blob: workers) or runs out of space mid-download, it falls back to memory automatically.
+
+```typescript
+import { cleanupDownloadCache } from '@time-file/browser-file-crypto';
+
+// Opt out of disk-backed assembly
+await downloadAndDecrypt(url, { password, fileName, storage: 'memory' });
+
+// Temporary files are removed 30 minutes after saving; call on page load to
+// reclaim space left by tabs closed in the meantime
+void cleanupDownloadCache();
+```
+
 ### Error Handling
 
 ```typescript
@@ -276,6 +289,8 @@ try {
 } catch (error) {
   if (isCryptoError(error)) {
     // error.code: 'INVALID_PASSWORD' | 'INVALID_KEYFILE' | 'INVALID_ENCRYPTED_DATA'
+    // error.cause (v1.2.0+): the original network / stream / memory error behind
+    // DOWNLOAD_FAILED, DECRYPTION_FAILED or ENCRYPTION_FAILED
   }
 }
 ```
